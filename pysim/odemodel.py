@@ -87,12 +87,29 @@ class ODEModel:
 															 params)
 		return self.data
 
+	def simulate_many(self,
+										end_time,
+										parameter_to_vary,
+										parameter_values,
+										timestep = 0.1):
+		self.data = []
+		for value in parameter_values:
+			self.data.append((parameter_to_vary, 
+												value, 
+												self._simulate(end_time,
+																			 timestep,
+																			 {},
+																			 {parameter_to_vary:value,})))
+		return self.data
+
 	def plot(self, species=None):
 		if self.data is None:
 			raise ValueError('No simulation data to plot')
 
 		if species == None:
 			species = self.species_names
+		if type(species) == str:
+			species = [species,]
 
 		for s in species:
 			if s not in self.species_names:
@@ -100,15 +117,29 @@ class ODEModel:
 
 		fig = plt.figure()
 		ax = fig.gca()
+		if not type(self.data) == list:
 
-		ax.plot(self.data.index, self.data[species], label=species)
+			ax.plot(self.data.index, self.data[species], label=species)
 
-		ax.set_xlabel("Simulation Time")
-		ax.set_ylabel("Species Amount")
+			ax.set_xlabel("Simulation Time")
+			ax.set_ylabel("Species Amount")
 
-		ax.legend(loc=0)
+			ax.legend(loc=0)
+
+		else:
+			species = species[0]
+
+			for initial_values, parameters, df in self.data:
+				label = str(initial_values) + ' ' + str(parameters)
+				ax.plot(df.index, df[species], label=label)
+
+			ax.set_xlabel("Simulation Time")
+			ax.set_ylabel("\'{}\'".format(species))
+
+			ax.legend(loc=0)
 
 		fig.show()
+
 
 
 
