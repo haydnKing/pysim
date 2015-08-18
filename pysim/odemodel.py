@@ -1,25 +1,25 @@
 from scipy.integrate import odeint
 import numpy as np, pandas as pd
 from matplotlib import pyplot as plt
-
+import copy
 
 class ODEModel:
-	def __init__(self, species_names, default_initial_values, **kwargs):
+	def __init__(self, species, **kwargs):
 		#names must be unique
 		self.species_names = []
-		for name in species_names:
+		self.initial_values = []
+		for name, value in species:
 			if name in self.species_names:
 				raise ValueError('species names must be unique,'+ 
 					' \'{}\' repeated'.format(name))
 			self.species_names.append(name)
-		self.initial_values = np.array(default_initial_values)
+			self.initial_values.append(value)
 
-		#species_names and default_initial_values should be the same length
-		if len(self.species_names) != len(self.default_initial_values):
-			raise ValueError('Should provide the same number of names as initial values')
 		self.parameters = {}
 		for k,v in kwargs.items():
 			self.parameters[k] = v
+
+		self.data=None
 
 	def is_species(self, species_name):
 		return species_name in self.species_names
@@ -67,7 +67,7 @@ class ODEModel:
 				raise ValueError('Unknown parameter \'{}\''.format(k))
 			sim_params[k] = v
 
-		t_out = np.arrange(0, end_time, timestep)
+		t_out = np.arange(0, end_time, timestep)
 		y_out = odeint(self._get_system_fn(sim_params),
 									 sim_vars,
 									 t_out)
@@ -82,13 +82,13 @@ class ODEModel:
 							 initial_values = {},
 							 params = {}):
 		self.data = self._simulate(end_time, 
-															 initial_values,
 															 timestep,
+															 initial_values,
 															 params)
 		return self.data
 
 	def plot(self, species=None):
-		if not self.data:
+		if self.data is None:
 			raise ValueError('No simulation data to plot')
 
 		if species == None:
@@ -101,7 +101,7 @@ class ODEModel:
 		fig = plt.figure()
 		ax = fig.gca()
 
-		ax.plot(self.data.index, self.data.loc[species], label=species)
+		ax.plot(self.data.index, self.data[species], label=species)
 
 		ax.set_xlabel("Simulation Time")
 		ax.set_ylabel("Species Amount")

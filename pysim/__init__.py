@@ -1,1 +1,1 @@
-from odemodel import ODEModel
+from pysim.odemodel import ODEModel
