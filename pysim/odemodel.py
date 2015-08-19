@@ -1,7 +1,20 @@
 from scipy.integrate import odeint
 import numpy as np, pandas as pd
 from matplotlib import pyplot as plt
-import copy
+import copy, itertools
+
+class ODEData:
+	def __init__(self, start_conditions, parameters, df):
+		self.start_conditions = start_conditions
+		self.parameters = parameters
+		self.df = df
+
+	def __str__(self):
+		l = ["{} = {}".format(k,v) for k,v in 
+					itertools.chain(self.start_conditions.items(),
+													self.parameters.items())]
+		
+		return '\n'.join(l)
 
 class ODEModel:
 	def __init__(self, species, **kwargs):
@@ -19,7 +32,7 @@ class ODEModel:
 		for k,v in kwargs.items():
 			self.parameters[k] = v
 
-		self.data=None
+		self.data=[]
 
 	def is_species(self, species_name):
 		return species_name in self.species_names
@@ -45,6 +58,9 @@ class ODEModel:
 		def f(y, t):
 			return self.system_fn(t, params, *y)
 		return f
+
+	def save_data(self, start_cond, params, df):
+		self.data.append(ODEData(start_cond, params, df))
 
 	def _simulate(self, 
 								end_time, 
@@ -81,66 +97,45 @@ class ODEModel:
 							 timestep = 0.1,
 							 initial_values = {},
 							 params = {}):
-		self.data = self._simulate(end_time, 
+		self.save_data(initial_values,
+									 params,
+									 self._simulate(end_time, 
 															 timestep,
 															 initial_values,
-															 params)
-		return self.data
+															 params))
 
 	def simulate_many(self,
 										end_time,
 										parameter_to_vary,
 										parameter_values,
 										timestep = 0.1):
-		self.data = []
 		for value in parameter_values:
-			self.data.append((parameter_to_vary, 
-												value, 
-												self._simulate(end_time,
-																			 timestep,
-																			 {},
-																			 {parameter_to_vary:value,})))
-		return self.data
+			self.save_data({}, 
+										 {parameter_to_vary:value,},
+										 self._simulate(end_time,
+																		timestep,
+																		{},
+																		{parameter_to_vary:value,}))
 
-	def plot(self, species=None):
+	def plot(self, species, ax=None):
 		if self.data is None:
 			raise ValueError('No simulation data to plot')
 
-		if species == None:
-			species = self.species_names
-		if type(species) == str:
-			species = [species,]
+		if species not in self.species_names:
+			raise ValueError('Unknown species \'{}\''.format(species))
 
-		for s in species:
-			if s not in self.species_names:
-				raise ValueError('Unknown species \'{}\''.format(s))
+		if ax is None:
+			ax = plt.figure().gca()
 
-		fig = plt.figure()
-		ax = fig.gca()
-		if not type(self.data) == list:
+		for odedata in self.data:
+			ax.plot(odedata.df.index, odedata.df[species], label=str(odedata))
 
-			ax.plot(self.data.index, self.data[species], label=species)
+		ax.set_xlabel("Simulation Time")
+		ax.set_ylabel("\'{}\'".format(species))
 
-			ax.set_xlabel("Simulation Time")
-			ax.set_ylabel("Species Amount")
+		ax.legend(loc=0)
 
-			ax.legend(loc=0)
-
-		else:
-			species = species[0]
-
-			for initial_values, parameters, df in self.data:
-				label = str(initial_values) + ' ' + str(parameters)
-				ax.plot(df.index, df[species], label=label)
-
-			ax.set_xlabel("Simulation Time")
-			ax.set_ylabel("\'{}\'".format(species))
-
-			ax.legend(loc=0)
-
-		fig.show()
-
-
+		return ax
 
 
 

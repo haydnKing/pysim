@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 class FluorescentReporterModel(pysim.ODEGrowth):
 	def __init__(self):
-		super().__init__(pysim.ExponentialGrowth(60*60),
+		super().__init__(pysim.GompertzGrowth(),
 										 [
 											('promoter', 1.), #promoter availability
 											('mRNA', 0.), #mRNA
@@ -30,9 +30,10 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 if __name__ == '__main__':
 	print("Running model...")
 	model = FluorescentReporterModel()
-	model.simulate_many(60*60, 
+	model.simulate_many(750,
+											timestep=0.01,
 											parameter_to_vary = 'k_deg_prot',
 											parameter_values = [0.1, 0.02, 0.01,])
-	model.plot(species=['R*'])
+	model.plot(species='R*')
 	plt.show(block=True)
 

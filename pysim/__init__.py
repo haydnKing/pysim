@@ -1,2 +1,2 @@
-from pysim.odemodel import ODEModel
-from pysim.growthmodel import ODEGrowth, ExponentialGrowth
+from pysim.odemodel import *
+from pysim.growthmodel import *
