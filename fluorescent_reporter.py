@@ -19,13 +19,33 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 										 k_deg_prot = 0.01,
 										 k_activation = 0.1)
 
-	def system_fn(self, t, params, promoter, mRNA, R, R_star):
-		return [0, #constant promoter
-						params['k_transcription'] * promoter - params['k_deg_mRNA'] * mRNA, #mRNA
-						params['k_translation'] * mRNA - params['k_deg_prot'] * R, #R
-						params['k_activation'] * R - params['k_deg_prot'] * R_star, #R*
-					 ]
-
+	def define_reactions(self, names, params):
+		return [
+				pysim.Reaction(names, 
+											 ((1, 'promoter',),),
+											 ((1, 'promoter',),(1, 'mRNA'),),
+											 params['k_transcription']),
+				pysim.Reaction(names,
+											 ((1, 'mRNA',),),
+											 (),
+											 params['k_deg_mRNA']),
+				pysim.Reaction(names,
+											 ((1, 'mRNA',),),
+											 ((1, 'mRNA',),(1, 'R'),),
+											 params['k_translation']),
+				pysim.Reaction(names,
+											 ((1, 'R',),),
+											 (),
+											 params['k_deg_prot']),
+				pysim.Reaction(names,
+											((1, 'R'),),
+											((1, 'R*'),),
+											params['k_activation']),
+				pysim.Reaction(names,
+											((1, 'R*'),),
+											(),
+											params['k_deg_prot']),
+				]
 
 if __name__ == '__main__':
 	print("Running model...")

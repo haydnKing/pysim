@@ -16,6 +16,56 @@ class ODEData:
 		
 		return '\n'.join(l)
 
+class Reaction:
+	def __init__(self, species_names, lhs, rhs, k_fw, k_rv=0):
+		"""Define the reaction.
+		Species names is an ordered list of the species names
+		lhs and rhs should be a list of (stoichiometry, species_name) tuples
+		k_fw and k_rv are the forward and reverse rate constants
+		"""
+		self.k_fw = k_fw
+		self.k_rv = k_rv
+		self.species_names = species_names
+
+		#setup stochiometry arrays
+		self.stoic_l = np.zeros(len(species_names))
+		self.stoic_r = np.zeros(len(species_names))
+
+		for stoic, name in lhs:
+			self.stoic_l[species_names.index(name)] = stoic
+	
+		for stoic, name in rhs:
+			self.stoic_r[species_names.index(name)] = stoic	
+
+	def get_rates(self, y):
+		K_fw = (-self.k_fw * np.product(np.power(y,self.stoic_l)) +
+						self.k_rv * np.product(np.power(y,self.stoic_r)))
+		
+		#print("return {} * ({} - {})".format(K_fw, self.stoic_l, self.stoic_r))
+		return K_fw * (self.stoic_l - self.stoic_r)
+
+	def __str__(self):
+		l = []
+		for species, stoic in zip(self.species_names, self.stoic_l):
+			if stoic > 0:
+				if stoic == 1:
+					l.append(species)
+				else:
+					l.append("{} {}".format(stoic, species))
+
+
+		r = []
+		for species, stoic in zip(self.species_names, self.stoic_r):
+			if stoic > 0:
+				if stoic == 1:
+					r.append(species)
+				else:
+					r.append("{} {}".format(stoic, species))
+
+		return '{} {} {}'.format(' + '.join(l), 
+														 '->' if (self.k_rv==0) else '<->',
+														 ' + '.join(r))
+
 class ODEModel:
 	def __init__(self, species, **kwargs):
 		#names must be unique
@@ -34,6 +84,11 @@ class ODEModel:
 
 		self.data=[]
 
+
+		reactions = self.define_reactions(self.species_names, self.parameters)
+		for r in reactions:
+			print(r)
+
 	def is_species(self, species_name):
 		return species_name in self.species_names
 
@@ -51,12 +106,17 @@ class ODEModel:
 			raise ValueError('\'{}\' is not a know parameter'.format(parameter_name))
 		self.parameter_values[parameter_name]
 
-	def system_fn(self, t, params):
+	def define_reactions(self, names, params):
 		pass
 
 	def _get_system_fn(self, params):
+		reactions = self.define_reactions(self.species_names, params)
 		def f(y, t):
-			return self.system_fn(t, params, *y)
+			ret = np.zeros(len(y))
+			for r in reactions:
+				ret += r.get_rates(y)
+		#	print(ret)
+			return ret
 		return f
 
 	def save_data(self, start_cond, params, df):
