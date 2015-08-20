@@ -41,7 +41,6 @@ class Reaction:
 		K_fw = (-self.k_fw * np.product(np.power(y,self.stoic_l)) +
 						self.k_rv * np.product(np.power(y,self.stoic_r)))
 		
-		#print("return {} * ({} - {})".format(K_fw, self.stoic_l, self.stoic_r))
 		return K_fw * (self.stoic_l - self.stoic_r)
 
 	def __str__(self):
@@ -85,9 +84,10 @@ class ODEModel:
 		self.data=[]
 
 
-		reactions = self.define_reactions(self.species_names, self.parameters)
-		for r in reactions:
-			print(r)
+		#self._curr_params = self.parameters
+		#reactions = self.define_reactions()
+		#for r in reactions:
+		#	print(r)
 
 	def is_species(self, species_name):
 		return species_name in self.species_names
@@ -106,16 +106,104 @@ class ODEModel:
 			raise ValueError('\'{}\' is not a know parameter'.format(parameter_name))
 		self.parameter_values[parameter_name]
 
-	def define_reactions(self, names, params):
+	def define_reactions(self):
 		pass
 
+	def build_reaction(self, reaction_str, fwd_param_name, rev_param_name=None):
+		"""Utility function to build reaction
+		reaction_str = "[reactant_def]* reaction_type [reactant_def]*"
+			where:
+				reactant_def := + [stoichiometry=1] species_name
+					nb. the first '+' may be omitted from a list of reactant_defs
+							and at least one reactant_def section must be present
+				reaction_type = -> | <->
+					->: irreversable reaction (-> rev_param_name is None)
+					<->: reversable reaction
+
+
+		"""
+
+		#parse reaction string
+		lhs = []
+		rhs = []
+		left = True
+		cur_stoic = None
+		got_plus = False
+		reaction_type = ''
+
+		for token in reaction_str.split(' '):
+			#ignore ''
+			if not token:
+				continue
+			#if we find reaction marker
+			elif token in ('->', '<->'):
+				#can't be part way through a reactant
+				if cur_stoic is not None:
+					raise ValueError('Expected species_name after \'{}\''.format(cur_stoic))
+				#can't be expecting another reactant
+				elif got_plus:
+					raise ValueError('Expected species_name or stoichiometry after \'+\'')
+				#can't have already had a reaction marker
+				elif not left:
+					raise ValueError('Unexpected \'{}\' after \'{}\''.format(token, reaction_type))
+				else:
+					reaction_type = token
+					left=False
+			#if we find a plus
+			elif token == '+':
+				#can't have already seen one
+				if got_plus:
+					raise ValueError('Unexpected \'+\' after \'+\'')
+				#can't be expecting a species_name
+				elif cur_stoic is not None:
+					raise ValueError('Expected species_name after \'{}\', not \'+\''.format(cur_stoic))
+				else:
+					got_plus = True
+			#if stoichiometry
+			elif is_int(token):
+				#must be positive
+				if int(token)<=0:
+					raise ValueError('stoichiometry value must be positive ({}<=0)'.format(int(token)))
+				#must not have already seen a stoichiometry token
+				elif cur_stoic is not None:
+					raise ValueError('unexpected {} after stoichiometry {}'.format(int(token), cur_stoic)) 
+				else:
+					cur_stoic = int(token)
+			elif token in self.species_names:
+				#if there was no plus and this isn't the first species
+				if not got_plus and len((lhs if left else rhs)) > 0:
+					raise ValueError('expected \'+\' before species name \'{}\''.format(species_name))
+				else:
+					(lhs if left else rhs).append((cur_stoic if cur_stoic else 1, token))
+					cur_stoic = None
+					got_plus = False
+			else:
+				raise ValueError('unexpected token \'{}\''.format(token))
+
+		
+		if left or reaction_type == '':
+			raise ValueError('Did not find reaction sign \'->\' or \'<->\'')
+
+		if reaction_type == '->':
+			if rev_param_name is not None:
+				raise ValueError('Reverse parameter given in irreversable reaction')
+			return Reaction(self.species_names, lhs, rhs, self._curr_params[fwd_param_name])
+		
+		return Reaction(self.species_names, 
+										lhs, 
+										rhs, 
+										self._curr_params[fwd_param_name],
+										self._curr_params[rev_param_name])
+
+
+
 	def _get_system_fn(self, params):
-		reactions = self.define_reactions(self.species_names, params)
+		self._curr_params = params
+		reactions = self.define_reactions()
 		def f(y, t):
 			ret = np.zeros(len(y))
 			for r in reactions:
 				ret += r.get_rates(y)
-		#	print(ret)
 			return ret
 		return f
 
@@ -198,5 +286,10 @@ class ODEModel:
 		return ax
 
 
-
+def is_int(value):
+	try:
+		int(value)
+	except:
+		return False
+	return True
 
