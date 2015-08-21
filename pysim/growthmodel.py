@@ -73,6 +73,8 @@ class ODEGrowth(ODEModel):
 			ax2.set_ylabel("Cell Count")
 
 	def save_data(self, start_cond, params, df):
-		df = df.multiply(self.growth_model.cell_count(np.array(df.index)), axis=0)
+		for species in self.species_names:
+			if species not in self.no_dilute_species:
+				df[species] = df[species].multiply(self.growth_model.cell_count(np.array(df.index)))
 		super().save_data(start_cond, params, df)
 
