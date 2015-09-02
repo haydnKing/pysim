@@ -3,7 +3,7 @@
 import pysim
 import matplotlib.pyplot as plt
 
-class FluorescentReporterModel(pysim.ODEGrowth):
+class ArsOperonModel(pysim.ODEGrowth):
 	def __init__(self):
 		super().__init__(pysim.GompertzGrowth(),
 										 [
@@ -49,7 +49,7 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 
 if __name__ == '__main__':
 	print("Running model...")
-	model = FluorescentReporterModel()
+	model = ArsOperonModel()
 	model.condition_sweep(750,
 												timestep=0.01,
 												condition_to_vary = 'As_ext',

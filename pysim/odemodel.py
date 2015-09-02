@@ -70,6 +70,15 @@ class ODEModel:
 		#names must be unique
 		self.species_names = []
 		self.initial_values = []
+		self._add_species(species)
+
+		self.parameters = {}
+		self._add_parameters(kwargs)
+
+		self.data=[]
+
+
+	def _add_species(self, species):
 		for name, value in species:
 			if name in self.species_names:
 				raise ValueError('species names must be unique,'+ 
@@ -77,17 +86,12 @@ class ODEModel:
 			self.species_names.append(name)
 			self.initial_values.append(value)
 
-		self.parameters = {}
-		for k,v in kwargs.items():
+	def _add_parameters(self, param_dict):
+		for k,v in param_dict.items():
+			if k in self.parameters.keys():
+				raise ValueError('parameter names must be unique, '+
+						'\'{}\' repeated'.format(k))
 			self.parameters[k] = v
-
-		self.data=[]
-
-
-		#self._curr_params = self.parameters
-		#reactions = self.define_reactions()
-		#for r in reactions:
-		#	print(r)
 
 	def is_species(self, species_name):
 		return species_name in self.species_names
@@ -277,6 +281,39 @@ class ODEModel:
 																		timestep,
 																		{condition_to_vary:value,},
 																		{}))
+
+	def get_response_at_time(self,
+													 end_time,
+													 condition_to_vary,
+													 condition_values,
+													 timestep=0.1):
+		df = pd.DataFrame(index=pd.Index(condition_values, name=condition_to_vary),
+											columns=self.species_names,
+											data=np.zeros((len(condition_values),
+												len(self.species_names))))
+
+		for value in condition_values:
+			out = self._simulate(end_time, 
+													 timestep, 
+													 {condition_to_vary:value,}, 
+													 {})
+			df.loc[value,:] = out.iloc[-1,:]
+
+		return df
+
+	def plot_response_at_time(self,
+														species_to_plot,
+														end_time,
+														condition_to_vary,
+														condition_values,
+														timestep=0.1):
+		df = self.get_response_at_time(end_time, 
+																	 condition_to_vary,
+																	 condition_values, 
+																	 timestep)
+
+		df[species_to_plot].plot()
+
 
 	def plot(self, species, ax=None):
 		if self.data is None:
