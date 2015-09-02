@@ -252,11 +252,11 @@ class ODEModel:
 															 initial_values,
 															 params))
 
-	def simulate_many(self,
-										end_time,
-										parameter_to_vary,
-										parameter_values,
-										timestep = 0.1):
+	def parameter_sweep(self,
+											end_time,
+											parameter_to_vary,
+											parameter_values,
+											timestep = 0.1):
 		for value in parameter_values:
 			self.save_data({}, 
 										 {parameter_to_vary:value,},
@@ -264,6 +264,19 @@ class ODEModel:
 																		timestep,
 																		{},
 																		{parameter_to_vary:value,}))
+
+	def condition_sweep(self,
+											end_time,
+											condition_to_vary,
+											condition_values,
+											timestep = 0.1):
+		for value in condition_values:
+			self.save_data({condition_to_vary:value,}, 
+										 {},
+										 self._simulate(end_time,
+																		timestep,
+																		{condition_to_vary:value,},
+																		{}))
 
 	def plot(self, species, ax=None):
 		if self.data is None:

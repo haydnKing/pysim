@@ -13,7 +13,7 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 											('ArsB', 0.), 
 											('ArsR2', 0.), 
 											('pArs_ArsR2', 0),
-											('As_ext', 0),
+											('As_ext', 0.),
 											('As_int', 0),
 											('ArsR_As', 0),
 										 ],
@@ -28,7 +28,7 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 										 k_ArsR_ArsR_rv = 0.01,
 										 k_ArsR_As_fw = 1.0,
 										 k_ArsR_As_rv = 0.01,
-										 k_As_in = 0.0000001,
+										 k_As_in = 0.0001,
 										 k_As_out = 0.5)
 
 	def define_reactions(self):
@@ -50,10 +50,10 @@ class FluorescentReporterModel(pysim.ODEGrowth):
 if __name__ == '__main__':
 	print("Running model...")
 	model = FluorescentReporterModel()
-	model.simulate_many(750,
-											timestep=0.01,
-											parameter_to_vary = 'k_ArsR_ArsR_fw',
-											parameter_values = [1.0, 0.1, 0.01,])
-	model.plot(species='pArs')
+	model.condition_sweep(750,
+												timestep=0.01,
+												condition_to_vary = 'As_ext',
+												condition_values = [0., 10000., 100000.,1000000.])
+	model.plot(species='ArsB')
 	plt.show(block=True)
 
