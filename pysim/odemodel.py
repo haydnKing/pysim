@@ -103,12 +103,12 @@ class ODEModel:
 		self.initial_values[self.species_names.index(species_name)] = value
 
 	def get_parameter(self, parameter_name):
-		return self.parameter_values(parameter_name)
+		return self.parameters[parameter_name]
 
 	def set_parameter(self, parameter_name, parameter_value):
-		if not parameter_name in self.parameters:
+		if not parameter_name in self.parameters.keys():
 			raise ValueError('\'{}\' is not a know parameter'.format(parameter_name))
-		self.parameter_values[parameter_name]
+		self.parameters[parameter_name] = parameter_value
 
 	def define_reactions(self):
 		pass
@@ -334,6 +334,10 @@ class ODEModel:
 		ax.legend(loc=0)
 
 		return ax
+
+	def __str__(self):
+		self._curr_params = self.parameters
+		return '\n'.join(str(r) for r in self.define_reactions())
 
 
 def is_int(value):
