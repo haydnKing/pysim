@@ -88,14 +88,14 @@ class Reaction:
         parse_reactants(r_stoic, symbols[reaction_spec+1:])
 
         #now parse the reaction spec
-        m = re.match("(?:<\[([\w\^]+)\])?--\[([\w\^]+)\]>", 
+        m = re.match("(?:<\[(.+)\])?--\[(.+)\]>", 
                      symbols[reaction_spec])
         if not m:
             raise ReactionError("malformed reaction spec")
         k_rv = None
         if m.groups()[0]:
-            k_rv = const_symbols.getIndexByName(m.groups()[0])
-        k_fw = const_symbols.getIndexByName(m.groups()[1])
+            k_rv = const_symbols.getIndexByName(m.groups()[0].strip())
+        k_fw = const_symbols.getIndexByName(m.groups()[1].strip())
 
         return Reaction(const_symbols, 
                         var_symbols,
@@ -124,7 +124,10 @@ class Reaction:
                 if s != 0:
                     out.append('+')
                     if s != 1:
-                        out.append(str(s))
+                        if s == int(s):
+                            out.append(str(int(s)))
+                        else:
+                            out.append(str(s))
                     out.append(self.species.names[i])
             return " ".join(out[1:])
 
