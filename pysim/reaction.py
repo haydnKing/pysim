@@ -81,6 +81,8 @@ class Reaction:
             if "--" in s:
                 reaction_spec = i
                 break
+        if reaction_spec < 0:
+            raise ReactionError("No reaction spec found")
 
         #parse lhs
         parse_reactants(l_stoic, symbols[:reaction_spec])
@@ -88,8 +90,7 @@ class Reaction:
         parse_reactants(r_stoic, symbols[reaction_spec+1:])
 
         #now parse the reaction spec
-        m = re.match("(?:<\[(.+)\])?--\[(.+)\]>", 
-                     symbols[reaction_spec])
+        m = re.match("(?:<\[(.+)\])?--\[(.+)\]>", symbols[reaction_spec])
         if not m:
             raise ReactionError("malformed reaction spec")
         k_rv = None

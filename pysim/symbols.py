@@ -5,7 +5,7 @@ class SymbolTable:
     def __init__(self):
         self.names = []
         self.values = np.array([])
-        self._r = re.compile("[\w\^]+")
+        self._r = re.compile("[^\s\[\]]+")
 
     def addSymbol(self, name, value=0):
         self._check_valid(name)
@@ -13,7 +13,7 @@ class SymbolTable:
             raise DuplicateNameError(name)
         else:
             self.names.append(name)
-            self.values = np.append(self.values, value)
+            self.values = np.append(self.values, float(value))
 
     def addFromStr(self, string):
         syms = [s.strip() for s in string.split('=')]
@@ -50,7 +50,7 @@ class SymbolTable:
     def __str__(self):
         o = []
         for i,name in enumerate(self.names):
-            if self.values[i] == 0:
+            if self.values[i] == 0.0:
                 o.append(name)
             else:
                 o.append("{}={}".format(name, self.values[i]))

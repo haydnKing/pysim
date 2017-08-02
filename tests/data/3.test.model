@@ -1,0 +1,6 @@
+species  monomer
+param k_{fw}  = 6.0
+param k_{rv}= 4
+species dimer
+
+2 monomer <[k_{rv}]--[k_{fw}]>   dimer

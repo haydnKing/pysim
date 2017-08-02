@@ -35,7 +35,7 @@ class ODEModel:
                     else: #reaction
                         reactions.append(Reaction.fromStr(line, species, params))
                 except ParseError as p:
-                    p.setLine(i)
+                    p.setLine(i+1)
                     raise
         return cls(species, params, reactions)
 

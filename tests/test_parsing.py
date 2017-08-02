@@ -8,7 +8,7 @@ test_data = os.path.join(os.path.dirname(__file__), "data/")
 class ParsingTestSuite(unittest.TestCase):
     """Test parsing of model definitions"""
 
-    successes = ['1', '2', '3']
+    successes = ['1', '2', '3', '4']
 
     def test_success(self):
         for s in self.successes:
@@ -17,7 +17,7 @@ class ParsingTestSuite(unittest.TestCase):
             with open(os.path.join(test_data, 
                                         "{}.expected.model".format(s))) as f:
                 expected = f.read()
-            self.assertEqual(expected, str(model))
+            self.assertEqual(expected, str(model), "in test {}".format(s))
 
 if __name__ == "__main__":
     unittest.main()

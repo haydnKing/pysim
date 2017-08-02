@@ -1,0 +1,10 @@
+species p=1,q,r,s
+param k_p=1.0, d=50, k_d=20., k_f=30., k_b=5.
+
+p --[k_p]> p + r
+r --[d]>
+2 r --[k_d]> s
+s --[d]>
+s + p <[k_b]--[k_f]> q
+
+
