@@ -1,0 +1,4 @@
+species monomer,  dimer
+parameters k_{fw}  = 6.0, k_{rv}= 4
+
+monomer <[k_{rv}]--[k_{fw}]>   dimer

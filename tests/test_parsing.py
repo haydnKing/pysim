@@ -8,7 +8,7 @@ test_data = os.path.join(os.path.dirname(__file__), "data/")
 class ParsingTestSuite(unittest.TestCase):
     """Test parsing of model definitions"""
 
-    successes = ['simple']
+    successes = ['1', '2']
 
     def test_success(self):
         for s in self.successes:
