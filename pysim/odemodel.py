@@ -3,6 +3,8 @@ import numpy as np, pandas as pd
 from matplotlib import pyplot as plt
 import copy, itertools
 
+from reaction import Reaction
+
 class ODEData:
 	def __init__(self, start_conditions, parameters, df):
 		self.start_conditions = start_conditions
@@ -15,55 +17,6 @@ class ODEData:
 													self.parameters.items())]
 		
 		return '\n'.join(l)
-
-class Reaction:
-	def __init__(self, species_names, lhs, rhs, k_fw, k_rv=0):
-		"""Define the reaction.
-		Species names is an ordered list of the species names
-		lhs and rhs should be a list of (stoichiometry, species_name) tuples
-		k_fw and k_rv are the forward and reverse rate constants
-		"""
-		self.k_fw = k_fw
-		self.k_rv = k_rv
-		self.species_names = species_names
-
-		#setup stochiometry arrays
-		self.stoic_l = np.zeros(len(species_names))
-		self.stoic_r = np.zeros(len(species_names))
-
-		for stoic, name in lhs:
-			self.stoic_l[species_names.index(name)] = stoic
-	
-		for stoic, name in rhs:
-			self.stoic_r[species_names.index(name)] = stoic	
-
-	def get_rates(self, y):
-		K_fw = (-self.k_fw * np.product(np.power(y,self.stoic_l)) +
-						self.k_rv * np.product(np.power(y,self.stoic_r)))
-		
-		return K_fw * (self.stoic_l - self.stoic_r)
-
-	def __str__(self):
-		l = []
-		for species, stoic in zip(self.species_names, self.stoic_l):
-			if stoic > 0:
-				if stoic == 1:
-					l.append(species)
-				else:
-					l.append("{} {}".format(stoic, species))
-
-
-		r = []
-		for species, stoic in zip(self.species_names, self.stoic_r):
-			if stoic > 0:
-				if stoic == 1:
-					r.append(species)
-				else:
-					r.append("{} {}".format(stoic, species))
-
-		return '{} {} {}'.format(' + '.join(l), 
-														 '->' if (self.k_rv==0) else '<->',
-														 ' + '.join(r))
 
 class ODEModel:
 	def __init__(self, species, **kwargs):
@@ -112,92 +65,6 @@ class ODEModel:
 
 	def define_reactions(self):
 		pass
-
-	def build_reaction(self, reaction_str, fwd_param_name, rev_param_name=None):
-		"""Utility function to build reaction
-		reaction_str = "[reactant_def]* reaction_type [reactant_def]*"
-			where:
-				reactant_def := + [stoichiometry=1] species_name
-					nb. the first '+' may be omitted from a list of reactant_defs
-							and at least one reactant_def section must be present
-				reaction_type = -> | <->
-					->: irreversable reaction (-> rev_param_name is None)
-					<->: reversable reaction
-
-
-		"""
-
-		#parse reaction string
-		lhs = []
-		rhs = []
-		left = True
-		cur_stoic = None
-		got_plus = False
-		reaction_type = ''
-
-		for token in reaction_str.split(' '):
-			#ignore ''
-			if not token:
-				continue
-			#if we find reaction marker
-			elif token in ('->', '<->'):
-				#can't be part way through a reactant
-				if cur_stoic is not None:
-					raise ValueError('Expected species_name after \'{}\''.format(cur_stoic))
-				#can't be expecting another reactant
-				elif got_plus:
-					raise ValueError('Expected species_name or stoichiometry after \'+\'')
-				#can't have already had a reaction marker
-				elif not left:
-					raise ValueError('Unexpected \'{}\' after \'{}\''.format(token, reaction_type))
-				else:
-					reaction_type = token
-					left=False
-			#if we find a plus
-			elif token == '+':
-				#can't have already seen one
-				if got_plus:
-					raise ValueError('Unexpected \'+\' after \'+\'')
-				#can't be expecting a species_name
-				elif cur_stoic is not None:
-					raise ValueError('Expected species_name after \'{}\', not \'+\''.format(cur_stoic))
-				else:
-					got_plus = True
-			#if stoichiometry
-			elif is_int(token):
-				#must be positive
-				if int(token)<=0:
-					raise ValueError('stoichiometry value must be positive ({}<=0)'.format(int(token)))
-				#must not have already seen a stoichiometry token
-				elif cur_stoic is not None:
-					raise ValueError('unexpected {} after stoichiometry {}'.format(int(token), cur_stoic)) 
-				else:
-					cur_stoic = int(token)
-			elif token in self.species_names:
-				#if there was no plus and this isn't the first species
-				if not got_plus and len((lhs if left else rhs)) > 0:
-					raise ValueError('expected \'+\' before species name \'{}\''.format(species_name))
-				else:
-					(lhs if left else rhs).append((cur_stoic if cur_stoic else 1, token))
-					cur_stoic = None
-					got_plus = False
-			else:
-				raise ValueError('unexpected token \'{}\''.format(token))
-
-		
-		if left or reaction_type == '':
-			raise ValueError('Did not find reaction sign \'->\' or \'<->\'')
-
-		if reaction_type == '->':
-			if rev_param_name is not None:
-				raise ValueError('Reverse parameter given in irreversable reaction')
-			return Reaction(self.species_names, lhs, rhs, self._curr_params[fwd_param_name])
-		
-		return Reaction(self.species_names, 
-										lhs, 
-										rhs, 
-										self._curr_params[fwd_param_name],
-										self._curr_params[rev_param_name])
 
 
 
