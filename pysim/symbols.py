@@ -1,4 +1,4 @@
-from exceptions import *
+from .exceptions import *
 import numpy as np, re
 
 class SymbolTable:

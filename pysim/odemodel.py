@@ -1,8 +1,9 @@
 from scipy.integrate import odeint
 import numpy as np
 
-from reaction import Reaction
-from symbols import SymbolTable
+from .reaction import Reaction
+from .symbols import SymbolTable
+from .exceptions import ParseError
 
 class ODEModel:
     def __init__(self, species, params, reactions):
@@ -15,11 +16,11 @@ class ODEModel:
         species = SymbolTable()
         params = SymbolTable()
         reactions = []
-        with f as open(filename):
+        with open(filename) as f:
             for i,line in enumerate(f):
                 line = line.strip()
-                #ignore comments
-                if line[0] == '#':
+                #ignore empty lines and comments
+                if not line or line[0] == '#':
                     continue
                 
                 try:
@@ -27,25 +28,25 @@ class ODEModel:
                     syms = line.split()
                     if syms[0] == "species":
                         for declaration in " ".join(syms[1:]).split(','):
-                            species.addFromString(declaration)
+                            species.addFromStr(declaration)
                     elif syms[0] == "param":
                         for declaration in " ".join(syms[1:]).split(','):
-                            params.addFromString(declaration)
+                            params.addFromStr(declaration)
                     else: #reaction
-                        reactions.append(Reaction.fromStr(line))
-                except ParseException as p:
+                        reactions.append(Reaction.fromStr(line, species, params))
+                except ParseError as p:
                     p.addLine(i)
                     raise
         return cls(species, params, reactions)
 
     def __str__(self):
         lines = [
+            'param ' + str(self.params),
             'species ' + str(self.species),
-            'param' + std(self.params),
         ]
 
         lines += [str(r) for r in self.reactions]
-        return '\n'.join(lines)
+        return '\n'.join(lines) + '\n'
 
 #    def _get_system_fn(self, params):
 #        self._curr_params = params

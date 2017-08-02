@@ -1,10 +1,10 @@
 import numpy as np, re
-from exceptions import *
-from symbols import SymbolTable
+from .exceptions import *
+from .symbols import SymbolTable
 
 class Reaction:
     """A reaction within the model"""
-    def __init__(self, constants, species, l_stoic, r_stoic, k_fw, k_rv=None):
+    def __init__(self, params, species, l_stoic, r_stoic, k_fw, k_rv=None):
         """Define the reaction.
             const_symbols: SymbolTable to use
             l_stoic: np.array of left hand stoichiometry
@@ -15,23 +15,23 @@ class Reaction:
         """
         self.k_fw = k_fw
         self.k_rv = k_rv
-        self.consts = constants
+        self.params = params
         self.species = species
-
-        #setup stochiometry arrays
-        self.stoic_l = const_l
-        self.stoic_r = const_r
+        self.l_stoic = l_stoic
+        self.r_stoic = r_stoic
 
     @classmethod
     def fromStr(cls, line, var_symbols, const_symbols):
-		"""Utility function to build reaction from string definition
-		reaction_str = "[reactant_def]* reaction_spec [reactant_def]*"
-			where:
-				reactant_def := + [stoichiometry=1] species_name
-					nb. the first '+' may be omitted from a list of reactant_defs
-				reaction_spec = --[fw_rate_symbol]> | <[rv_rate_symbol]--[fw_rate_symbol]>
-		"""
+        """Utility function to build reaction from string definition
+        reaction_str = "[reactant_def]* reaction_spec [reactant_def]*"
+        where:
+            reactant_def := + [stoichiometry=1] species_name
+            nb. the first '+' may be omitted from a list of reactant_defs
+            reaction_spec = --[fw_rate_symbol]> | <[rv_rate_symbol]--[fw_rate_symbol]>
+            """
         def parse_reactants(stoic, symbols):
+            if not symbols:
+                return
             #add a leading + if there isn't one
             if symbols[0][0] != '+':
                 symbols = ['+'] + symbols
@@ -122,20 +122,20 @@ class Reaction:
             out = []
             for i,s in enumerate(stoic):
                 if s != 0:
-                    s.append('+')
+                    out.append('+')
                     if s != 1:
-                        s.append(str(s))
-                    s.append(self.species.names[i])
+                        out.append(str(s))
+                    out.append(self.species.names[i])
             return " ".join(out[1:])
 
         spec = ""
         if self.k_rv:
-            spec = "<[{}]--[{}]>".format(self.consts.names[self.k_rv],
-                                         self.consts.names[self.k_fw])
+            spec = "<[{}]--[{}]>".format(self.params.names[self.k_rv],
+                                         self.params.names[self.k_fw])
         else:
-            spec = "--[{}]>".format(self.consts.names[self.k_fw])
+            spec = "--[{}]>".format(self.params.names[self.k_fw])
 
-        return "{} {} {}".format(str_species(self.l_stoic),
-                                 spec,
-                                 str_species(self.r_stoic))
+        return " ".join([str_species(self.l_stoic),
+                         spec,
+                         str_species(self.r_stoic)]).strip()
 

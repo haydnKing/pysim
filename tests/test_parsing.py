@@ -3,7 +3,7 @@ from context import pysim
 
 import unittest, os.path
 
-test_data = os.path.join(__file__, "data/")
+test_data = os.path.join(os.path.dirname(__file__), "data/")
 
 class ParsingTestSuite(unittest.TestCase):
     """Test parsing of model definitions"""
