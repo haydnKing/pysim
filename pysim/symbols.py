@@ -47,3 +47,12 @@ class SymbolTable:
     def __len__(self):
         return len(self.names)
 
+    def __str__(self):
+        o = []
+        for i,name in enumerate(self.names):
+            if self.values[i] == 0:
+                o.append(name)
+            else:
+                o.append("{}={}".format(name, self.values[i]))
+        return ", ".join(o)
+

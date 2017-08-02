@@ -38,6 +38,15 @@ class ODEModel:
                     raise
         return cls(species, params, reactions)
 
+    def __str__(self):
+        lines = [
+            'species ' + str(self.species),
+            'param' + std(self.params),
+        ]
+
+        lines += [str(r) for r in self.reactions]
+        return '\n'.join(lines)
+
 #    def _get_system_fn(self, params):
 #        self._curr_params = params
 #        reactions = self.define_reactions()

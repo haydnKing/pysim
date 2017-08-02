@@ -1,0 +1,4 @@
+param create=1.0, degrade=0.5
+species one
+<[degrade]--[create]> one
+

@@ -1,0 +1,7 @@
+#simple test model, input
+
+species one
+param create=1.0, degrade=0.5
+
+<[degrade]--[create]> one
+
