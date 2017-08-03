@@ -27,30 +27,30 @@ class RateTests(unittest.TestCase):
     def test_fw_reaction(self):
         fn = self.model.reactions[0].getRateEquation()
         exp = np.array([-1.0, 1.0, 0.0])
-        tests = [([1,1,1], 1.0*exp),
-                 ([1,2,2], 1.0*exp),
-                 ([7,2,2], 7.0*exp),]
+        tests = [([1,1,1], 1.0),
+                 ([1,2,2], 1.0),
+                 ([7,2,2], 7.0),]
         self._helper(fn, tests)
 
     def test_reversible_reaction(self):
         fn = self.model.reactions[1].getRateEquation()
         exp = np.array([-1.0, 1.0, 0.0])
-        tests = [([1,1,1],  0.0*exp),
-                 ([1,2,2], -1.0*exp),
-                 ([7,2,2],  5.0*exp),]
+        tests = [([1,1,1],  0.0),
+                 ([1,2,2], -1.0),
+                 ([7,2,2],  5.0),]
         self._helper(fn, tests)
 
     def test_MM_reaction(self):
         fn = self.model.reactions[2].getRateEquation()
         exp = np.array([-1.0, 1.0, 0.0])
-        tests = [([1,1,1], 0.5*exp),
-                 ([1,2,2], 1.0*exp),
-                 ([7,2,2], 2.8*exp),]
+        tests = [([1,1,1], 0.5),
+                 ([1,2,2], 1.0),
+                 ([7,2,2], 2.8),]
         self._helper(fn, tests)
 
     def _helper(self, fn, tests):
         for i,(y, resp) in enumerate(tests):
-            npt.assert_allclose(fn(y), resp, err_msg="case {}".format(i))
+            self.assertEqual(fn(y), resp, "case {}".format(i))
 
 
 

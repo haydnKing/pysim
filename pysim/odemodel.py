@@ -50,21 +50,18 @@ class ODEModel:
         lines += [str(r) for r in self.reactions]
         return '\n'.join(lines) + '\n'
 
-#    def _get_system_fn(self, params):
-#        self._curr_params = params
-#        reactions = self.define_reactions()
-#        def f(y, t):
-#            ret = np.zeros(len(y))
-#            for r in reactions:
-#                ret += r.getRates(y)
-#                return ret
-#        return f
-#
+    def _get_system_fn(self):
+        #stoichiometry matrix len(species)xlen(reactions)
+        S = np.array([r.getStoiciometry() for r in reactions]).T
+        rates = [r.getRateEquation() for r in self.reactions]
+        def f(y, t):
+            ret = np.array([r(y) for r in rates])
+            return S * ret
+        return f
+
 #    def _simulate(self, 
 #                  end_time, 
-#                  timestep = 0.1,
-#                  initial_values = {},
-#                  params = {}):
+#                  timestep = 0.1):
 #        #copy species
 #        sim_vars = copy.copy(self.initial_values)
 #        for k,v in initial_values.items():

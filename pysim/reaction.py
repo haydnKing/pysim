@@ -110,10 +110,12 @@ class Reaction:
         k_m = params.values[args[2]]
         return lambda y,s: (y[e]*k_cat*s)/(k_m+s)
 
+    def getStoiciometry(self):
+        return self.r_stoic - self.l_stoic
+
     def getRateEquation(self):
         """Return a function which calculates the rates of change for each 
             species due to this reaction given the current concentrations y"""
-        delta_stoic = self.r_stoic - self.l_stoic
         f_fw = self._get_rateeq(self.k_fw, self.params)
         f_rv = self._get_rateeq(self.k_rv, self.params)
 
@@ -123,7 +125,7 @@ class Reaction:
             #if reversable, subtract rate of reverse reaction
             K_fw -= f_rv(species, np.product(np.power(species,self.r_stoic)))
 
-            return K_fw * delta_stoic
+            return K_fw
 
         return fn
 
