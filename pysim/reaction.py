@@ -3,6 +3,8 @@ from .exceptions import *
 from .symbols import SymbolTable
 
 class Reaction:
+    _reaction = re.compile(r"(?:<\[(.+)\])?--\[(.+)\]>")
+    _component = re.compile(r"(\d+)?\s*([a-zA-Z_^][a-zA-Z0-9_\{\}^]*)")
     """A reaction within the model"""
     def __init__(self, params, species, l_stoic, r_stoic, k_fw, k_rv=None):
         """Define the reaction.
@@ -38,7 +40,7 @@ class Reaction:
             for symbol in (s.strip() for s in spec.split('+')):
                 if not symbol:
                     raise ExpectedSymbolError("Missing reaction component")
-                m = re.match(r"(\d+)?\s*([a-zA-Z_^][a-zA-Z0-9_\{\}^]*)", symbol)
+                m = cls._component.match(symbol)
                 if not m:
                     raise ReactionError(
                         "Couldn't parse reaction component from \"{}\"".format(
@@ -53,7 +55,7 @@ class Reaction:
         r_stoic = np.zeros(len(species))
         
         #find the reaction specification
-        rs = re.search(r"(?:<\[(.+)\])?--\[(.+)\]>", line) 
+        rs = cls._reaction.search(line) 
         if not rs:
             raise ReactionError("No reaction spec found")
 
