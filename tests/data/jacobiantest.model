@@ -1,0 +1,9 @@
+param k_p=1, d=3, k_f=5, k_b=7
+species x_1, x_2
+
+--[k_p]> x_1
+2x_1 <[k_b]--[k_f]> x_2
+x_1 --[d]>
+x_2 --[d]>
+
+

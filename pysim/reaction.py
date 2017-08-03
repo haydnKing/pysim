@@ -110,6 +110,26 @@ class Reaction:
         k_m = params.values[args[2]]
         return lambda y,s: (y[e]*k_cat*s)/(k_m+s)
 
+    @staticmethod
+    def _get_jacobian(args, params, stoic):
+        """return function to calculate row of jacobian from this reaction"""
+        if not args:
+            return lambda y,s: np.zeros(len(y))
+        if len(args) == 1:
+            k = params.values[args[0]]
+            return lambda y,s: np.array([a*k*s/b for a,b in zip(stoic, y)])
+        e = args[0]
+        k_cat = params.values[args[1]]
+        k_m = params.values[args[2]]
+        def j(y,s):
+            a = 1./(k_m + s)
+            b = (y[e] * k_cat * s) * a * a
+            dg = np.array([s_o*y[e]*k_cat*s/x_o for s_o,x_o in zip(stoic, y)])
+            dh = np.array([s_o*s/x_o for s_o, x_o in zip(stoic, y)])
+            return a*dg - b*dh
+        return j
+
+
     def getStoiciometry(self):
         return self.r_stoic - self.l_stoic
 
@@ -126,6 +146,22 @@ class Reaction:
             K_fw -= f_rv(species, np.product(np.power(species,self.r_stoic)))
 
             return K_fw
+
+        return fn
+
+    def getJacobianEquation(self):
+        """Return a function which calculates the rates of change for each 
+            species due to this reaction given the current concentrations y"""
+        f_fw = self._get_jacobian(self.k_fw, self.params, self.l_stoic)
+        f_rv = self._get_jacobian(self.k_rv, self.params, self.r_stoic)
+
+        def fn(species):
+            #find the forward part of the jacobian
+            J = f_fw(species, np.product(np.power(species,self.l_stoic)))
+            #if reversable, subtract the reverse part of the jacobian
+            J -= f_rv(species, np.product(np.power(species,self.r_stoic)))
+
+            return J 
 
         return fn
 
