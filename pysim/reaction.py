@@ -31,28 +31,6 @@ class Reaction:
             nb. the first '+' may be omitted from a list of reactant_defs
             reaction_spec = [<\[rv_rate_symbol\]]--\[fw_rate_symbol\]>
             """
-        def parse_reactants(stoic, spec):
-            if not spec:
-                return
-            #remove optional first '+'
-            if spec[0] == '+':
-                spec = spec[1:]
-            for symbol in (s.strip() for s in spec.split('+')):
-                if not symbol:
-                    raise ExpectedSymbolError("Missing reaction component")
-                m = cls._component.match(symbol)
-                if not m:
-                    raise ReactionError(
-                        "Couldn't parse reaction component from \"{}\"".format(
-                            symbol))
-                index = species.getIndexByName(m.groups()[1])
-                if m.groups()[0]:
-                    stoic[index] += int(m.groups()[0])
-                else:
-                    stoic[index] += 1
-
-        l_stoic = np.zeros(len(species))
-        r_stoic = np.zeros(len(species))
         
         #find the reaction specification
         rs = cls._reaction.search(line) 
@@ -60,22 +38,64 @@ class Reaction:
             raise ReactionError("No reaction spec found")
 
         #parse lhs
-        parse_reactants(l_stoic, line[:rs.start()])
+        l_stoic = cls._parse_reactants(species, line[:rs.start()])
         #parse rhs
-        parse_reactants(r_stoic, line[rs.end():])
+        r_stoic = cls._parse_reactants(species, line[rs.end():])
 
         #now parse the reaction spec
-        k_rv = None
+        k_rv = []
         if rs.groups()[0]:
-            k_rv = params.getIndexByName(rs.groups()[0].strip())
-        k_fw = params.getIndexByName(rs.groups()[1].strip())
+            k_rv = [s.strip() for s in rs.groups()[0].split(',')]
+        k_fw = [s.strip() for s in rs.groups()[1].split(',')]
 
         return Reaction(params, 
                         species,
                         l_stoic, 
                         r_stoic, 
-                        k_fw, 
-                        k_rv)
+                        cls._parse_rateeq(k_fw, params, species), 
+                        cls._parse_rateeq(k_rv, params, species))
+    
+    @classmethod
+    def _parse_reactants(cls, species, spec):
+        """parse a string of reactants
+            species: species SymbolTable 
+            spec: reactant string (e.g. "3f + 5g")
+        """
+        stoic = np.zeros(len(species))
+        if not spec:
+            return stoic
+        #remove optional first '+'
+        if spec[0] == '+':
+            spec = spec[1:]
+        for symbol in (s.strip() for s in spec.split('+')):
+            if not symbol:
+                raise ExpectedSymbolError("Missing reaction component")
+            m = cls._component.match(symbol)
+            if not m:
+                raise ReactionError(
+                    "Couldn't parse reaction component from \"{}\"".format(
+                        symbol))
+            index = species.getIndexByName(m.groups()[1])
+            if m.groups()[0]:
+                stoic[index] += int(m.groups()[0])
+            else:
+                stoic[index] += 1
+        return stoic
+
+    @staticmethod
+    def _parse_rateeq(args, params, species):
+        #zero rate
+        if not args:
+            return []
+        #proportional rate
+        if len(args) == 1:
+            return [params.getIndexByName(args[0]),]
+        #michaelis-menten
+        elif len(args) == 3:
+            return [species.getIndexByName(args[0]),
+                    params.getIndexByName(args[1]),
+                    params.getIndexByName(args[2]),]
+        raise ReactionError("Cannot parse reaction rate")
 
     def getRates(self, y):
         """Calculate the rates of change for each species due to this reaction
@@ -104,12 +124,21 @@ class Reaction:
                     out.append(self.species.names[i])
             return " ".join(out[1:])
 
+        def str_rate(r):
+            if not r:
+                return ""
+            if len(r) == 1:
+                return self.params.names[r[0]]
+            return ", ".join([self.species.names[r[0]],
+                              self.params.names[r[1]],
+                              self.params.names[r[2]]])
+
         spec = ""
         if self.k_rv:
-            spec = "<[{}]--[{}]>".format(self.params.names[self.k_rv],
-                                         self.params.names[self.k_fw])
+            spec = "<[{}]--[{}]>".format(str_rate(self.k_rv),
+                                         str_rate(self.k_fw))
         else:
-            spec = "--[{}]>".format(self.params.names[self.k_fw])
+            spec = "--[{}]>".format(str_rate(self.k_fw))
 
         return " ".join([str_species(self.l_stoic),
                          spec,

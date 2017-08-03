@@ -1,10 +1,10 @@
 species p=1,q,r,s
-param k_p=1.0, d=50, k_d=20., k_f=30., k_b=5.
+param k_p=1.0, d=50, k_d=20., k_f=30., k_b=5., k_cat=1.0, k_m=2
 
 p--[ k_p]> p +r
 r --[d ]>
 2r --[k_d]> s
-s --[d ]>
+s --[r,k_cat,k_m]>
 s+p<[k_b]--[k_f]>q
 
 
