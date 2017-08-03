@@ -97,18 +97,35 @@ class Reaction:
                     params.getIndexByName(args[2]),]
         raise ReactionError("Cannot parse reaction rate")
 
-    def getRates(self, y):
-        """Calculate the rates of change for each species due to this reaction
-           given the current concentrations y"""
-        #find the forward rate of the reaction
-        K_fw = (self.consts.values[self.k_fw] 
-                    * np.product(np.power(y,self.stoic_l)))
-        #if reversable, subtract rate of reverse reaction
-        if self.k_rv:
-            K_fw -= (self.consts.values[self.k_rv] 
-                        * np.product(np.power(y,self.stoic_r)))
+    @staticmethod
+    def _get_rateeq(args, params):
+        """return a function which calculates 1directional rate"""
+        if not args:
+            return lambda y,s: 0
+        if len(args) == 1:
+            k = params.values[args[0]]
+            return lambda y,s: k * s
+        e = args[0]
+        k_cat = params.values[args[1]]
+        k_m = params.values[args[2]]
+        return lambda y,s: (y[e]*k_cat*s)/(k_m+s)
 
-        return K_fw * (self.stoic_r - self.stoic_l)
+    def getRateEquation(self):
+        """Return a function which calculates the rates of change for each 
+            species due to this reaction given the current concentrations y"""
+        delta_stoic = self.r_stoic - self.l_stoic
+        f_fw = self._get_rateeq(self.k_fw, self.params)
+        f_rv = self._get_rateeq(self.k_rv, self.params)
+
+        def fn(species):
+            #find the forward rate of the reaction
+            K_fw = f_fw(species, np.product(np.power(species,self.l_stoic)))
+            #if reversable, subtract rate of reverse reaction
+            K_fw -= f_rv(species, np.product(np.power(species,self.r_stoic)))
+
+            return K_fw * delta_stoic
+
+        return fn
 
     def __str__(self):
         def str_species(stoic):
