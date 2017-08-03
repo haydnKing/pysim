@@ -113,6 +113,10 @@ class MMJacobianTests(unittest.TestCase):
         q = np.array([1,1,1])
         npt.assert_allclose(self._getJ(q), self._expectedJ(q))
 
+    def test_2(self):
+        q = np.array([0,0,0])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
 
     def _expectedJ(self, x):
         k1 = self.model.params.getValueByName("k1")
@@ -146,6 +150,27 @@ class SolveTests(unittest.TestCase):
         out = self.model.solve(True)
         print("withJ {}".format(out))
         npt.assert_allclose(out, np.array([1./5., 1./(15.)]))
+
+class MMSolveTests(unittest.TestCase):
+    def setUp(self):
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                           "MMJacobiantest.model"))
+        k1 = self.model.params.getValueByName("k1")
+        k2 = self.model.params.getValueByName("k2")
+        kc = self.model.params.getValueByName("k_cat")
+        km = self.model.params.getValueByName("k_m")
+
+        self.solution = np.array([km/(kc/k2-1), k1/k2, k1/k2])
+
+    def test_solve_without_J(self):
+        out = self.model.solve(False)
+        print("withoutJ {}".format(out))
+        npt.assert_allclose(out, self.solution)
+
+    def test_solve_with_J(self):
+        out = self.model.solve(True)
+        print("withJ {}".format(out))
+        npt.assert_allclose(out, self.solution)
 
 if __name__ == "__main__":
     unittest.main()

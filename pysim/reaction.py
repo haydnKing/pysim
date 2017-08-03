@@ -137,7 +137,7 @@ class Reaction:
             dh = np.array([stoic[i] * np.power(X[i],stoic[i]-1) * 
                            np.product(np.power(np.delete(X,i), 
                                                np.delete(stoic,i)))
-                           for i in I])
+                           if stoic[i] else 0.0 for i in I])
             dg = X[e] * k_cat*dh
             #special case
             dg[e] = (stoic[e]+1)*k_cat*np.product(np.power(X,stoic))
