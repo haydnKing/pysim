@@ -21,85 +21,55 @@ class Reaction:
         self.r_stoic = r_stoic
 
     @classmethod
-    def fromStr(cls, line, var_symbols, const_symbols):
+    def fromStr(cls, line, params, species):
         """Utility function to build reaction from string definition
         reaction_str = "[reactant_def]* reaction_spec [reactant_def]*"
         where:
             reactant_def := + [stoichiometry=1] species_name
             nb. the first '+' may be omitted from a list of reactant_defs
-            reaction_spec = --[fw_rate_symbol]> | <[rv_rate_symbol]--[fw_rate_symbol]>
+            reaction_spec = [<\[rv_rate_symbol\]]--\[fw_rate_symbol\]>
             """
-        def parse_reactants(stoic, symbols):
-            if not symbols:
+        def parse_reactants(stoic, spec):
+            if not spec:
                 return
-            #add a leading + if there isn't one
-            if symbols[0][0] != '+':
-                symbols = ['+'] + symbols
-            need_plus = True
-            seen_stoic = False
-            stoic_value = 1
-            for symbol in symbols:
-                if need_plus:
-                    if symbol[0] != '+':
-                        raise UnexpectedSymbolError(symbol)
-                    need_plus = False
-                    #if there was a + on its own
-                    if len(symbol) == 1:
-                        continue
-                    #if the plus was attached to the symbol
-                    else:
-                        symbol = symbol[1:]
-                if not seen_stoic:
-                    #try and extract stoichiometry
-                    try:
-                        stoic_value = int(symbol)
-                        seen_stoic = True
-                        #success, move to next symbol
-                        continue
-                    except ValueError:
-                        #no stoichiometry, must be a species
-                        pass
-                #parse the species
-                stoic[var_symbols.getIndexByName(symbol)] += stoic_value
-                #reset state
-                need_plus = True
-                seen_stoic = False
-                stoic_value = 1
-            #check iteration didn't end while we were expecting something
-            if not need_plus:
-                if seen_stoic:
-                    raise ExpectedSymbolError("species identifier")
-                raise ExpectedSymbolError("species identifier or stoichiometry")
+            #remove optional first '+'
+            if spec[0] == '+':
+                spec = spec[1:]
+            for symbol in (s.strip() for s in spec.split('+')):
+                if not symbol:
+                    raise ExpectedSymbolError("Missing reaction component")
+                m = re.match(r"(\d+)?\s*([a-zA-Z_^][a-zA-Z0-9_\{\}^]*)", symbol)
+                if not m:
+                    raise ReactionError(
+                        "Couldn't parse reaction component from \"{}\"".format(
+                            symbol))
+                index = species.getIndexByName(m.groups()[1])
+                if m.groups()[0]:
+                    stoic[index] += int(m.groups()[0])
+                else:
+                    stoic[index] += 1
+
+        l_stoic = np.zeros(len(species))
+        r_stoic = np.zeros(len(species))
         
-        l_stoic = np.zeros(len(var_symbols))
-        r_stoic = np.zeros(len(var_symbols))
-        
-        symbols = line.split()
         #find the reaction specification
-        reaction_spec = -1
-        for i,s in enumerate(symbols):
-            if "--" in s:
-                reaction_spec = i
-                break
-        if reaction_spec < 0:
+        rs = re.search(r"(?:<\[(.+)\])?--\[(.+)\]>", line) 
+        if not rs:
             raise ReactionError("No reaction spec found")
 
         #parse lhs
-        parse_reactants(l_stoic, symbols[:reaction_spec])
+        parse_reactants(l_stoic, line[:rs.start()])
         #parse rhs
-        parse_reactants(r_stoic, symbols[reaction_spec+1:])
+        parse_reactants(r_stoic, line[rs.end():])
 
         #now parse the reaction spec
-        m = re.match("(?:<\[(.+)\])?--\[(.+)\]>", symbols[reaction_spec])
-        if not m:
-            raise ReactionError("malformed reaction spec")
         k_rv = None
-        if m.groups()[0]:
-            k_rv = const_symbols.getIndexByName(m.groups()[0].strip())
-        k_fw = const_symbols.getIndexByName(m.groups()[1].strip())
+        if rs.groups()[0]:
+            k_rv = params.getIndexByName(rs.groups()[0].strip())
+        k_fw = params.getIndexByName(rs.groups()[1].strip())
 
-        return Reaction(const_symbols, 
-                        var_symbols,
+        return Reaction(params, 
+                        species,
                         l_stoic, 
                         r_stoic, 
                         k_fw, 

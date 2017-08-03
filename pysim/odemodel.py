@@ -33,7 +33,9 @@ class ODEModel:
                         for declaration in " ".join(syms[1:]).split(','):
                             params.addFromStr(declaration)
                     else: #reaction
-                        reactions.append(Reaction.fromStr(line, species, params))
+                        reactions.append(Reaction.fromStr(line, 
+                                                          params, 
+                                                          species))
                 except ParseError as p:
                     p.setLine(i+1)
                     raise
