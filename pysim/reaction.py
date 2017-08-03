@@ -114,20 +114,30 @@ class Reaction:
     def _get_jacobian(args, params, stoic):
         """return function to calculate row of jacobian from this reaction"""
         if not args:
-            return lambda y,s: np.zeros(len(y))
+            return lambda x: np.zeros(len(x))
         if len(args) == 1:
             k = params.values[args[0]]
-            return lambda y,s: np.array([a*k*s/b for a,b in zip(stoic, y)])
+            I = range(len(stoic))
+            def j(X): 
+                a = np.array([
+                    stoic[i] * k * np.power(X[i],stoic[i]-1) *
+                    np.product(np.power(np.delete(X,i), np.delete(stoic,i)))
+                    if stoic[i] else 0.0 for i in I])
+                print("  j({}, stoic={}) = {}".format(X, stoic, a))
+                return a
+            return j
+
         e = args[0]
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
-        def j(y,s):
+        def j(y):
             a = 1./(k_m + s)
             b = (y[e] * k_cat * s) * a * a
             dg = np.array([s_o*y[e]*k_cat*s/x_o for s_o,x_o in zip(stoic, y)])
             dh = np.array([s_o*s/x_o for s_o, x_o in zip(stoic, y)])
-            return a*dg - b*dh
+            return a*np.nan_to_num(dg) - b*np.nan_to_num(dh)
         return j
+
 
 
     def getStoiciometry(self):
@@ -157,9 +167,9 @@ class Reaction:
 
         def fn(species):
             #find the forward part of the jacobian
-            J = f_fw(species, np.product(np.power(species,self.l_stoic)))
+            J = f_fw(species)
             #if reversable, subtract the reverse part of the jacobian
-            J -= f_rv(species, np.product(np.power(species,self.r_stoic)))
+            J -= f_rv(species)
 
             return J 
 

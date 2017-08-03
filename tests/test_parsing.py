@@ -49,7 +49,7 @@ class RateTests(unittest.TestCase):
         for i,(y, resp) in enumerate(tests):
             self.assertEqual(fn(y), resp, "case {}".format(i))
 
-class RateTests(unittest.TestCase):
+class JacobianTests(unittest.TestCase):
     def setUp(self):
          self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
                                                            "jacobiantest.model"))
@@ -80,7 +80,46 @@ class RateTests(unittest.TestCase):
         return np.array([r.getJacobianEquation()(y) 
                          for r in self.model.reactions])
 
+class MoreJacobianTests(unittest.TestCase):
+    def setUp(self):
+         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                           "solvetest1.model"))
 
+    def test_1(self):
+        q = np.array([1,1])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
+    def test_2(self):
+        q = np.array([5,1])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
+    def test_3(self):
+        q = np.array([0,0])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
+    def _expectedJ(self, x):
+        return np.array([[-3-4*5*x[0], 0,],
+                         [2*5*x[0], -3,]])
+
+    def _getJ(self, y):
+        return self.model._get_fprime()(y)
+
+
+
+class SolveTests(unittest.TestCase):
+    def setUp(self):
+         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                           "solvetest1.model"))
+
+    def test_solve_without_J(self):
+        out = self.model.solve(False)
+        print("withoutJ {}".format(out))
+        npt.assert_allclose(out, np.array([1./5., 1./(15.)]))
+
+    def test_solve_with_J(self):
+        out = self.model.solve(True)
+        print("withJ {}".format(out))
+        npt.assert_allclose(out, np.array([1./5., 1./(15.)]))
 
 if __name__ == "__main__":
     unittest.main()

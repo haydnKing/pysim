@@ -1,4 +1,5 @@
 from scipy.integrate import odeint
+from scipy.optimize import fsolve
 import numpy as np
 
 from .reaction import Reaction
@@ -50,52 +51,38 @@ class ODEModel:
         lines += [str(r) for r in self.reactions]
         return '\n'.join(lines) + '\n'
 
-    def _get_system_fn(self):
+    def _get_f(self):
         #stoichiometry matrix len(species)xlen(reactions)
-        S = np.array([r.getStoiciometry() for r in reactions]).T
+        S = np.array([r.getStoiciometry() for r in self.reactions]).T
         rates = [r.getRateEquation() for r in self.reactions]
-        def f(y, t):
+        def f(y):
             ret = np.array([r(y) for r in rates])
-            return S * ret
+            return S.dot(ret)
         return f
 
-#    def _simulate(self, 
-#                  end_time, 
-#                  timestep = 0.1):
-#        #copy species
-#        sim_vars = copy.copy(self.initial_values)
-#        for k,v in initial_values.items():
-#            #check for duff initial_values
-#            if k not in self.species_names:
-#                raise ValueError('Unknown species \'{}\''.format(k))
-#            sim_vars[self.species_names.index(k)] = v 
-#
-#        #copy parameters
-#        sim_params = copy.copy(self.parameters)
-#        for k,v in params.items():
-#            #check for unknown parameters
-#            if k not in self.parameters:
-#                raise ValueError('Unknown parameter \'{}\''.format(k))
-#            sim_params[k] = v
-#
-#        t_out = np.arange(0, end_time, timestep)
-#        y_out = odeint(self._get_system_fn(sim_params),
-#                       sim_vars,
-#                       t_out)
-#
-#        return pd.DataFrame(data=y_out,
-#                            index=t_out,
-#                            columns=self.species_names)
-#
-#    def simulate(self, 
-#                 end_time, 
-#                 timestep = 0.1,
-#                 initial_values = {},
-#                 params = {}):
-#        self.save_data(initial_values,
-#                       params,
-#                       self._simulate(end_time, 
-#                                      timestep,
-#                                      initial_values,
-#                                      params))
+    def _get_fprime(self):
+        #stoichiometry matrix len(species)xlen(reactions)
+        S = np.array([r.getStoiciometry() for r in self.reactions]).T
+        J = [r.getJacobianEquation() for r in self.reactions]
+        def j(y):
+            print("J({}) = {}".format(y, S.dot(np.array([r(y) for r in J]))))
+            return S.dot(np.array([r(y) for r in J]))
+        return j
+
+    def solve(self, use_fprime=True):
+        
+        fprime = None
+        if use_fprime:
+            fprime = self._get_fprime()
+
+        out = fsolve(self._get_f(), 
+                     self.species.values,
+                     fprime=fprime,
+                     full_output=True,
+                     col_deriv=False)
+
+        print(out)
+        return out[0]
+
+
 

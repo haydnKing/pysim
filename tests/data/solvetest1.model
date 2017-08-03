@@ -1,0 +1,9 @@
+param k_r=1, d=3, k_d=5
+species x, y
+
+--[k_r]> x
+x --[d]>
+y --[d]>
+2x --[k_d]> y
+
+
