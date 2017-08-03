@@ -123,19 +123,26 @@ class Reaction:
                     stoic[i] * k * np.power(X[i],stoic[i]-1) *
                     np.product(np.power(np.delete(X,i), np.delete(stoic,i)))
                     if stoic[i] else 0.0 for i in I])
-                print("  j({}, stoic={}) = {}".format(X, stoic, a))
                 return a
             return j
 
         e = args[0]
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
-        def j(y):
+        I = range(len(stoic))
+        def j(X):
+            s = np.product(np.power(X, stoic))
             a = 1./(k_m + s)
-            b = (y[e] * k_cat * s) * a * a
-            dg = np.array([s_o*y[e]*k_cat*s/x_o for s_o,x_o in zip(stoic, y)])
-            dh = np.array([s_o*s/x_o for s_o, x_o in zip(stoic, y)])
-            return a*np.nan_to_num(dg) - b*np.nan_to_num(dh)
+            b = (X[e] * k_cat * s) * a * a
+            dh = np.array([stoic[i] * np.power(X[i],stoic[i]-1) * 
+                           np.product(np.power(np.delete(X,i), 
+                                               np.delete(stoic,i)))
+                           for i in I])
+            dg = X[e] * k_cat*dh
+            #special case
+            dg[e] = (stoic[e]+1)*k_cat*np.product(np.power(X,stoic))
+            print("j({}) = {}".format(X, a*dg - b*dh))
+            return a*dg - b*dh
         return j
 
 

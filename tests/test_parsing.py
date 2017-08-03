@@ -104,6 +104,32 @@ class MoreJacobianTests(unittest.TestCase):
     def _getJ(self, y):
         return self.model._get_fprime()(y)
 
+class MMJacobianTests(unittest.TestCase):
+    def setUp(self):
+         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                           "MMJacobiantest.model"))
+
+    def test_1(self):
+        q = np.array([1,1,1])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
+
+    def _expectedJ(self, x):
+        k1 = self.model.params.getValueByName("k1")
+        k2 = self.model.params.getValueByName("k2")
+        kc = self.model.params.getValueByName("k_cat")
+        km = self.model.params.getValueByName("k_m")
+
+        q = kc*km*x[2]/((km+x[0])*(km+x[0]))
+        r = kc*x[0]/(km+x[0])
+
+        return np.array([[-q,   0, -r ],
+                         [ q, -k2,  r ],
+                         [ 0,   0, -k2]])
+
+    def _getJ(self, y):
+        return self.model._get_fprime()(y)
+
 
 
 class SolveTests(unittest.TestCase):

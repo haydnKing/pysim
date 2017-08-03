@@ -65,7 +65,7 @@ class ODEModel:
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
         J = [r.getJacobianEquation() for r in self.reactions]
         def j(y):
-            print("J({}) = {}".format(y, S.dot(np.array([r(y) for r in J]))))
+            _j = [r(y) for r in J]
             return S.dot(np.array([r(y) for r in J]))
         return j
 
@@ -78,11 +78,9 @@ class ODEModel:
         out = fsolve(self._get_f(), 
                      self.species.values,
                      fprime=fprime,
-                     full_output=True,
                      col_deriv=False)
 
-        print(out)
-        return out[0]
+        return out
 
 
 
