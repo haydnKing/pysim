@@ -160,6 +160,27 @@ class SolveTests(unittest.TestCase):
         out = self.model.solve(True)
         npt.assert_allclose(out, self._solution())
 
+class SolveTests2(unittest.TestCase):
+    def setUp(self):
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                          "solvetest2.model"))
+         
+    def _solution(self):
+        kp = self.model.get("kp")
+        mu = self.model.get("mu")
+        p0 = self.model.get("p")
+
+        return np.array([p0, kp * p0 / mu])
+
+
+    def test_solve_without_J(self):
+        out = self.model.solve(False)
+        npt.assert_allclose(out, self._solution())
+
+    def test_solve_with_J(self):
+        out = self.model.solve(True)
+        npt.assert_allclose(out, self._solution())
+
 class SetTests(SolveTests):
 
     def test_setSolve(self):

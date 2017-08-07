@@ -157,6 +157,7 @@ class Reaction:
         f_rv = self._get_rateeq(self.k_rv, self.params)
 
         def fn(species):
+            print("rate_equation({})".format(species))
             #find the forward rate of the reaction
             K_fw = f_fw(species, np.product(np.power(species,self.l_stoic)))
             #if reversable, subtract rate of reverse reaction
