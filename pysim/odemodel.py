@@ -75,7 +75,31 @@ class ODEModel:
             return S.dot(np.array([r(y) for r in J]))
         return j
 
+    def set(self, **kwargs):
+        """set params or species initial conditions"""
+        for k,v in kwargs.items():
+            if k in self.params:
+               self.params.setValueByName(k,v)
+            elif k in self.species:
+                self.species.setValueByName(k,v)
+            else:
+                raise KeyError("\"{}\" is not a known species or parameter"
+                               .format(k))
+
+    def get(self, name):
+        """get params or species initial conditions"""
+        if name in self.params:
+           return self.params.getValueByName(name)
+        elif name in self.species:
+           return self.species.getValueByName(name)
+        else:
+            raise KeyError("\"{}\" is not a known species or parameter"
+                           .format(k))
+
+
+
     def solve(self, use_fprime=True):
+        """Calculate the steady state solution of the system of equations"""
         
         fprime = None
         if use_fprime:

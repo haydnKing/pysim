@@ -28,6 +28,13 @@ class SymbolTable:
         except ValueError:
             raise NameLookupError(name)
 
+    def setValueByName(self, name, value):
+        try:
+            self.values[self.names.index(name)] = value
+        except ValueError:
+            raise NameLookupError(name)
+
+
     def getIndexByName(self, name):
         try:
             return self.names.index(name)

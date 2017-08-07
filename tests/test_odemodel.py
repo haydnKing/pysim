@@ -138,18 +138,36 @@ class MMJacobianTests(unittest.TestCase):
 
 class SolveTests(unittest.TestCase):
     def setUp(self):
-         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
-                                                           "solvetest1.model"))
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                          "solvetest1.model"))
+         
+    def _solution(self):
+        k_r = self.model.get("k_r")
+        k_d = self.model.get("k_d")
+        d = self.model.get("d")
+
+        x = 0.25 * (-d + np.sqrt(d*d+8.*k_d*k_r)) / k_d
+        y = x*x*k_d / d
+
+        return np.array([x,y])
+
 
     def test_solve_without_J(self):
         out = self.model.solve(False)
-        print("withoutJ {}".format(out))
-        npt.assert_allclose(out, np.array([1./5., 1./(15.)]))
+        npt.assert_allclose(out, self._solution())
 
     def test_solve_with_J(self):
         out = self.model.solve(True)
-        print("withJ {}".format(out))
-        npt.assert_allclose(out, np.array([1./5., 1./(15.)]))
+        npt.assert_allclose(out, self._solution())
+
+class SetTests(SolveTests):
+
+    def test_setSolve(self):
+        self.model.set(k_d = 7., d=2.5, k_r=3.)
+        npt.assert_allclose(self.model.solve(), self._solution())
+
+    def test_badSet(self):
+        self.assertRaises(KeyError, self.model.set, not_a_symbol=7.)
 
 class MMSolveTests(unittest.TestCase):
     def setUp(self):
