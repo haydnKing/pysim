@@ -7,6 +7,18 @@ class SymbolTable:
         self.values = np.array([])
         self._r = re.compile("[^\s\[\]]+")
 
+    def copy(self):
+        r = SymbolTable()
+        r.names = self.names.copy()
+        r.values = self.values.copy()
+        return r
+
+    def merge(self, rhs):
+        r = SymbolTable()
+        r.names = self.names + rhs.names
+        r.values = np.append(self.values, rhs.values)
+        return r
+
     def addSymbol(self, name, value=0):
         self._check_valid(name)
         if name in self.names:

@@ -1,3 +1,6 @@
+#expected solution:
+#x = -d/(2*k_d) + (1./2*k_d) * sqrt(d*d+4*k_d*k_r)
+#y = x*x*k_d / d
 param k_r=1, d=3, k_d=5
 species x, y
 
