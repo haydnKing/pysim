@@ -29,9 +29,15 @@ class ODEModel:
                     syms = line.split()
                     if syms[0] == "species":
                         for declaration in " ".join(syms[1:]).split(','):
+                            name = declaration.split('=')[0]
+                            if name in params:
+                                raise DuplicateNameError(name)
                             species.addFromStr(declaration)
                     elif syms[0] == "param":
                         for declaration in " ".join(syms[1:]).split(','):
+                            name = declaration.split('=')[0]
+                            if name in species:
+                                raise DuplicateNameError(name)
                             params.addFromStr(declaration)
                     else: #reaction
                         reactions.append(Reaction.fromStr(line, 
