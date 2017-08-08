@@ -46,5 +46,10 @@ class ReactionError(ParseError):
         super(ReactionError, self).__init__(
             "Couldn't parse reaction, {}".format(msg))
 
+class SyntaxParseError(ParseError):
+    def __init__(self, item, value):
+        super(SyntaxParseError, self).__init__(
+            "Couldn't parse {} \"{}\"".format(item, value))
+
 
 

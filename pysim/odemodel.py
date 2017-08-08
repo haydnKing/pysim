@@ -1,13 +1,13 @@
 from scipy.integrate import odeint
 from scipy.optimize import fsolve
-import numpy as np
+import numpy as np, re
 
 from .reaction import Reaction
 from .symbols import SymbolTable
-from .exceptions import ParseError
+from .exceptions import *
 
 class ODEModel:
-    def __init__(self, species, functions, params, reactions):
+    def __init__(self, species, params, functions, reactions):
         self.species = species
         self.functions = functions
         self.params = params
@@ -15,14 +15,18 @@ class ODEModel:
 
     @classmethod
     def fromFile(cls, filename):
-        species = SymbolTable()
-        functions = SymbolTable()
-        params = SymbolTable()
+        species = SymbolTable(float, 0.0)
+        functions = SymbolTable(str, "0.0")
+        params = SymbolTable(float, 0.0)
         reactions = []
-        def is_known(name):
-            return (   name in species 
-                    or name in functions 
-                    or name in params)
+
+        kw = {'species': species,
+              'func': functions,
+              'param': params,
+              'params': params,
+             }
+
+        eq = re.compile(r'([^\s=]+)\s*(?:=\s*(.+))?')
 
         with open(filename) as f:
             for i,line in enumerate(f):
@@ -34,23 +38,18 @@ class ODEModel:
                 try:
                     #find species and params
                     syms = line.split()
-                    if syms[0] == "species":
-                        for declaration in " ".join(syms[1:]).split(','):
-                            name = declaration.split('=')[0]
-                            if is_known(name):
+                    if syms[0] in kw.keys():
+                        for d in " ".join(syms[1:]).split(','):
+                            m = eq.match(d.strip())
+                            if not m:
+                                raise SyntaxParseError(syms[0], d.strip())
+                            name, value = m.groups()
+                            if (name in species or
+                                name in functions or
+                                name in params):
                                 raise DuplicateNameError(name)
-                            species.addFromStr(declaration)
-                    elif syms[0] == "param":
-                        for declaration in " ".join(syms[1:]).split(','):
-                            name = declaration.split('=')[0]
-                            if is_known(name):
-                                raise DuplicateNameError(name)
-                            params.addFromStr(declaration)
-                    elif syms[0] == "func":
-                        name,rvalue = " ".join(syms[1:]).split('=')
-                        if is_known(name):
-                            raise DuplicateNameError(name)
-                        functions.addSymbol(name,rvalue)
+                            kw[syms[0]].addSymbol(name, value)
+
                     else: #reaction
                         reactions.append(Reaction.fromStr(line, 
                                                           params, 
@@ -58,13 +57,15 @@ class ODEModel:
                 except ParseError as p:
                     p.setLine(i+1)
                     raise
-        return cls(species, params, reactions)
+        return cls(species, params, functions, reactions)
 
     def __str__(self):
         lines = [
             'param ' + str(self.params),
             'species ' + str(self.species),
         ]
+        #if self.functions:
+        #    lines += str(self.functions)
 
         lines += [str(r) for r in self.reactions]
         return '\n'.join(lines) + '\n'
@@ -102,11 +103,13 @@ class ODEModel:
         """get params or species initial conditions"""
         if name in self.params:
            return self.params.getValueByName(name)
+        elif name in self.functions:
+           return self.functions.getValueByName(name)
         elif name in self.species:
            return self.species.getValueByName(name)
         else:
             raise KeyError("\"{}\" is not a known species or parameter"
-                           .format(k))
+                           .format(name))
 
 
 

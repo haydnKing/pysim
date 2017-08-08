@@ -2,9 +2,11 @@ from .exceptions import *
 import re
 
 class SymbolTable:
-    def __init__(self):
+    def __init__(self, var_type=float, default=0.0):
         self.names = []
         self.values = []
+        self.var_type = var_type
+        self.default = default
         self._r = re.compile("[^\s\[\]]+")
 
     def copy(self):
@@ -19,17 +21,14 @@ class SymbolTable:
         r.values = self.values + rhs.values
         return r
 
-    def addSymbol(self, name, value=0.):
+    def addSymbol(self, name, value):
         self._check_valid(name)
         if name in self.names:
             raise DuplicateNameError(name)
-        else:
-            self.names.append(name)
-            self.values.append(value)
-
-    def addFromStr(self, string):
-        syms = [s.strip() for s in string.split('=')]
-        self.addSymbol(*syms)
+        if value is None:
+            value = self.default
+        self.names.append(name)
+        self.values.append(self.var_type(value))
 
     def __contains__(self, name):
         return name in self.names
@@ -68,10 +67,10 @@ class SymbolTable:
 
     def __str__(self):
         o = []
-        for i,name in enumerate(self.names):
-            if self.values[i] == 0.0:
+        for name,value in zip(self.names, self.values):
+            if value == self.default:
                 o.append(name)
             else:
-                o.append("{}={}".format(name, self.values[i]))
+                o.append("{}={}".format(name, value))
         return ", ".join(o)
 
