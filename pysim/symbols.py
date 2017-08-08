@@ -1,10 +1,10 @@
 from .exceptions import *
-import numpy as np, re
+import re
 
 class SymbolTable:
     def __init__(self):
         self.names = []
-        self.values = np.array([])
+        self.values = []
         self._r = re.compile("[^\s\[\]]+")
 
     def copy(self):
@@ -16,16 +16,16 @@ class SymbolTable:
     def merge(self, rhs):
         r = SymbolTable()
         r.names = self.names + rhs.names
-        r.values = np.append(self.values, rhs.values)
+        r.values = self.values + rhs.values
         return r
 
-    def addSymbol(self, name, value=0):
+    def addSymbol(self, name, value=0.):
         self._check_valid(name)
         if name in self.names:
             raise DuplicateNameError(name)
         else:
             self.names.append(name)
-            self.values = np.append(self.values, float(value))
+            self.values.append(value)
 
     def addFromStr(self, string):
         syms = [s.strip() for s in string.split('=')]

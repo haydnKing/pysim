@@ -7,16 +7,23 @@ from .symbols import SymbolTable
 from .exceptions import ParseError
 
 class ODEModel:
-    def __init__(self, species, params, reactions):
+    def __init__(self, species, functions, params, reactions):
         self.species = species
+        self.functions = functions
         self.params = params
         self.reactions = reactions
 
     @classmethod
     def fromFile(cls, filename):
         species = SymbolTable()
+        functions = SymbolTable()
         params = SymbolTable()
         reactions = []
+        def is_known(name):
+            return (   name in species 
+                    or name in functions 
+                    or name in params)
+
         with open(filename) as f:
             for i,line in enumerate(f):
                 line = line.strip()
@@ -30,15 +37,20 @@ class ODEModel:
                     if syms[0] == "species":
                         for declaration in " ".join(syms[1:]).split(','):
                             name = declaration.split('=')[0]
-                            if name in params:
+                            if is_known(name):
                                 raise DuplicateNameError(name)
                             species.addFromStr(declaration)
                     elif syms[0] == "param":
                         for declaration in " ".join(syms[1:]).split(','):
                             name = declaration.split('=')[0]
-                            if name in species:
+                            if is_known(name):
                                 raise DuplicateNameError(name)
                             params.addFromStr(declaration)
+                    elif syms[0] == "func":
+                        name,rvalue = " ".join(syms[1:]).split('=')
+                        if is_known(name):
+                            raise DuplicateNameError(name)
+                        functions.addSymbol(name,rvalue)
                     else: #reaction
                         reactions.append(Reaction.fromStr(line, 
                                                           params, 
