@@ -28,6 +28,8 @@ class ODEModel:
 
         eq = re.compile(r'([^\s=]+)\s*(?:=\s*(.+))?')
 
+        seen_reaction = False
+
         with open(filename) as f:
             for i,line in enumerate(f):
                 line = line.strip()
@@ -39,6 +41,8 @@ class ODEModel:
                     #find species and params
                     syms = line.split()
                     if syms[0] in kw.keys():
+                        if syms[0] == "species" and seen_reaction:
+                            raise ParseError("Cannot define species after reaction")
                         for d in " ".join(syms[1:]).split(','):
                             m = eq.match(d.strip())
                             if not m:
@@ -51,9 +55,11 @@ class ODEModel:
                             kw[syms[0]].addSymbol(name, value)
 
                     else: #reaction
-                        reactions.append(Reaction.fromStr(line, 
-                                                          params, 
-                                                          species))
+                        seen_reaction = True
+                        reactions.append(
+                            Reaction.fromStr(line, 
+                                             params, 
+                                             species.merge(functions)))
                 except ParseError as p:
                     p.setLine(i+1)
                     raise
@@ -73,19 +79,23 @@ class ODEModel:
     def _get_f(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        rates = [r.getRateEquation() for r in self.reactions]
+        rates = [r.getRateEquation(self.species.names,
+                                   self.functions) 
+                 for r in self.reactions]
         def f(y):
             ret = np.array([r(y) for r in rates])
-            return S.dot(ret)
+            return S.dot(ret)[:len(self.species)]
         return f
 
     def _get_fprime(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        J = [r.getJacobianEquation() for r in self.reactions]
+        J = [r.getJacobianEquation(self.species.names,
+                                   self.functions) 
+                  for r in self.reactions]
         def j(y):
-            _j = [r(y) for r in J]
-            return S.dot(np.array([r(y) for r in J]))
+            return S.dot(np.array([r(y) for r in J]))[:len(self.species),
+                                                      :len(self.species)]
         return j
 
     def set(self, **kwargs):

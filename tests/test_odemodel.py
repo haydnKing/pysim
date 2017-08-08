@@ -167,10 +167,18 @@ class SolveTests2(unittest.TestCase):
          
     def _solution(self):
         kp = self.model.get("kp")
+        kb = self.model.get("kb")
         mu = self.model.get("mu")
-        p0 = self.model.get("p")
 
-        return np.array([p0, kp * p0 / mu])
+        #find r
+        a = kb
+        b = kb + mu
+        c = -kp
+        
+        r = (-b + np.sqrt(b*b-4*a*c))/ (2.*a)
+        p = 1. / (1 + r * kb / mu)
+
+        return np.array([p,r])
 
 
     def test_solve_without_J(self):

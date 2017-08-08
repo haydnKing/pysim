@@ -1,6 +1,3 @@
-#expected solution:
-#p = p[0]
-#r = kp * p[0] / mu
 species p=1.0,r
 func q = 1-p
 param kp=1.0, mu=0.1, kb=0.5
