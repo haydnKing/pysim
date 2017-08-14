@@ -7,53 +7,98 @@ class Sim:
     def __init__(self, model):
         self.model = model
         self.defaults = model.params.copy()
-        self.sweeps = [None, ] * len(self.defaults)
+        self.query = None
 
     @classmethod
     def fromFile(self, modelfile):
         model = ODEModel.fromFile(modelfile)
         return Sim(model)
 
-    def setAbsSweep(self, name, values):
-        """name: parameter name to vary
-            values: np.array of values to set parameter during sweep"""
-        idx = self.defaults.getIndexByName(name)
-        self.sweeps[idx] = values
+    def numParameters(self):
+        return len(self.defaults)
 
-    def setRelSweep(self, name, values):
-        """Set Abs sweep, but relative to default value instead"""
-        self.setAbsSweep(name, values * self.defaults.getValueByName(name))
+    def addSweep(self, sweeps, relative=False):
+        """
+            Add a parameter sweep to the simulation
+            sweeps: dictionary of parameter names mapping to values to set
+                all possibile combinations will be solved.
+                Names should be pure parameter names or simple ratios of 
+                parameters, such as "a / b", in which case the ratio a/b will
+                be varied with the product ab held constant.
+                All names in sweeps should be independend, setting a sweep
+                on "a / b" and "b / c" will generate an error, instead try
+                setting a separate sweep.
+            relative: if true, sweep values are multiplied by the default value
+        """
+        #check each name only features once
+        sweepnames = []
+        for name in sweeps.keys():
+            names = [n.strip() for n in name.split('/')]
+            for n in names:
+                if n in sweepnames:
+                    raise ValueError(("Name \'{}\' used multiple times in " +
+                                      "argument to addSweep").format(n))
 
-    def _build_query_array(self):
-        """build the output dataframe"""
-        sweeps = [x if x is not None else [self.defaults.values[i],] 
-                  for i,x in enumerate(self.sweeps)]
-        rows = np.product([len(x) for x in sweeps]) 
+        sweeplist = [[x,] for x in self.defaults.values]
+        ratio_idx    = []
+        ratio_prod   = []
+        ratio_values = []
+        for k,v in sweeps.items():
+            if '/' in k:
+                names = [n.strip() for n in k.split('/')]
+                if len(names) != 2:
+                    raise ValueError("Invalid ratio spec \'{}\'".format(k))
+                idx = [self.defaults.getIndexByName(n) for n in names]
+                ratio_idx.append(idx)
+                ratio_prod.append(np.product(
+                    [self.defaults.values[i] for i in idx]))
+                if relative:
+                    ratio_values.append(v * 
+                                        self.defaults.values[idx[0]] / 
+                                        self.defaults.values[idx[1]])
+                else:
+                    ratio_values.append(v)
+            else:
+                idx = self.defaults.getIndexByName(k)
+                if relative:
+                    sweeplist[idx] = np.array(v) * sweeplist[idx]
+                else:
+                    sweeplist[idx] = np.array(v)
 
-        data = np.zeros((np.product([len(x) for x in sweeps]), 
-                         len(self.defaults)))
+        rows = np.product([len(x) for x in sweeplist + ratio_values]) 
 
-        for i,r in enumerate(itertools.product(*sweeps)):
-            data[i] = r
+        data = np.zeros((rows, self.numParameters()))
 
-        return data
+        lparams = len(self.defaults)
+        for i,p in enumerate(itertools.product(*(sweeplist+ratio_values))):
+            row = list(p[:lparams])
+            #set the ratio parameters
+            for j,r in enumerate(p[lparams:]):
+                a = np.sqrt(r * ratio_prod[j])
+                row[ratio_idx[j][0]] = a
+                row[ratio_idx[j][1]] = ratio_prod[j] / a
 
-    @staticmethod
-    def _solve(model, args, output):
-        for i in range(len(args)):
-            d = {}
-            for k,v in zip(model.params.names, args[i]):
-                d[k] = v
-            model.set(**d)
-            output[i] = model.solve()
+            data[i] = row
+
+        if self.query:
+            self.query = np.append(self.query, data, axis=0)
+        else:
+            self.query = data
+
+    def addQuery(self, query):
+        if query.shape[2] != self.numParameters():
+            raise ValueError("Queries need {} parameters, not {}".format(
+                self.numParameters(), query.shape[2]))
+        if self.query:
+            self.query = np.append(self.query, query, axis=0)
+        else:
+            self.query = query.copy()
 
     def solve(self):
-        q = self._build_query_array()
-        o = np.zeros((len(q), len(self.model.species)))
-        self._solve(self.model, q, o)
+        o = np.apply_along_axis(self.model.solveForParams, 1, self.query)
 
         df = pd.DataFrame(
-            data=np.append(q,o,1),
+            data=np.append(self.query,o,1),
             columns=self.model.params.names + self.model.species.names)
 
         return df

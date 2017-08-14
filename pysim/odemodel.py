@@ -109,6 +109,17 @@ class ODEModel:
                 raise KeyError("\"{}\" is not a known species or parameter"
                                .format(k))
 
+    def setAllParams(self, params):
+        """Set all parameters"""
+        if len(self.params) != len(params):
+            raise ValueError("Expected {} parameters, got {}".format(
+                len(self.params), len(params)))
+        self.params.values = np.array(params)
+
+    def solveForParams(self, params, use_fprime=True):
+        self.setAllParams(params)
+        return self.solve(use_fprime)
+
     def get(self, name):
         """get params or species initial conditions"""
         if name in self.params:
