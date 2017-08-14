@@ -113,6 +113,8 @@ class ODEModel:
         def g(y):
             z = np.square(y)
             R = fp(z)
+            for i in range(R.shape[0]):
+                R[:,i] *= 2 * y[i]
             return R
 
         return g

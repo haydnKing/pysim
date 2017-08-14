@@ -94,8 +94,8 @@ class Sim:
         else:
             self.query = query.copy()
 
-    def solve(self):
-        o = np.apply_along_axis(self.model.solveForParams, 1, self.query)
+    def solve(self, use_jacobian=True):
+        o = np.apply_along_axis(self.model.solveForParams, 1, self.query, use_jacobian)
 
         df = pd.DataFrame(
             data=np.append(self.query,o,1),
