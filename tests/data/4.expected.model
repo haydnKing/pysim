@@ -1,5 +1,5 @@
 param k_p=1.0, d=50.0, k_d=20.0, k_f=30.0, k_b=5.0, k_cat=1.0, k_m=2.0
-species p=1.0, q, r, s
+species p, q, r, s
 p --[k_p]> p + r
 r --[d]>
 2 r --[k_d]> s

@@ -15,7 +15,7 @@ class ODEModel:
 
     @classmethod
     def fromFile(cls, filename):
-        species = SymbolTable(float, 0.0)
+        species = SymbolTable(float, 1.0)
         functions = SymbolTable(str, "0.0")
         params = SymbolTable(float, 0.0)
         reactions = []
@@ -76,7 +76,7 @@ class ODEModel:
         lines += [str(r) for r in self.reactions]
         return '\n'.join(lines) + '\n'
 
-    def _get_f(self):
+    def _get_unwrapped_f(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
         rates = [r.getRateEquation(self.species.names,
@@ -87,7 +87,16 @@ class ODEModel:
             return S.dot(ret)[:len(self.species)]
         return f
 
-    def _get_fprime(self):
+    def _get_f(self):
+        f = self._get_unwrapped_f()
+
+        def g(y):
+            z = np.square(y)
+            return f(z)
+
+        return g
+
+    def _get_unwrapped_fprime(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
         J = [r.getJacobianEquation(self.species.names,
@@ -97,6 +106,16 @@ class ODEModel:
             return S.dot(np.array([r(y) for r in J]))[:len(self.species),
                                                       :len(self.species)]
         return j
+    
+    def _get_fprime(self):
+        fp = self._get_unwrapped_fprime()
+
+        def g(y):
+            z = np.square(y)
+            R = fp(z)
+            return R
+
+        return g
 
     def set(self, **kwargs):
         """set params or species initial conditions"""
@@ -146,7 +165,7 @@ class ODEModel:
                      fprime=fprime,
                      col_deriv=False)
 
-        return out
+        return np.square(out)
 
 
 

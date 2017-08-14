@@ -19,7 +19,7 @@ class ParsingTestSuite(unittest.TestCase):
                 expected = f.read()
             self.assertEqual(expected, str(model), "in test {}".format(s))
 
-class RateTests(unittest.TestCase):
+class ReactionRateTests(unittest.TestCase):
     def setUp(self):
          self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
                                                            "ratetest.model"))
@@ -48,6 +48,32 @@ class RateTests(unittest.TestCase):
     def _helper(self, fn, tests):
         for i,(y, resp) in enumerate(tests):
             self.assertEqual(fn(y), resp, "case {}".format(i))
+
+class GoverningFunctionTests(unittest.TestCase):
+    def setUp(self):
+         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                           "ratetest.model"))
+
+    def test_governing_fn(self):
+        tests = [np.array([1.0,1.0,1.0]),
+                 np.array([2.0,1.0,1.0]),
+                 np.array([1.0,2.0,0.0]),
+                 np.array([1.0,1.0,2.0]),]
+        f = self.model._get_f()
+        for q in tests:
+            npt.assert_allclose(f(np.sqrt(q)), 
+                                self._rate(q), 
+                                atol=10e-12,
+                                err_msg="q = {}".format(q))
+
+    def _rate(self, q):
+        kfw = self.model.get("k_fw")
+        krv = self.model.get("k_rv")
+        kcat = self.model.get("k_cat")
+        km = self.model.get("k_m")
+
+        a = q[1] * krv - 2 * kfw * q[0] - kcat*q[2]*q[0] / (km + q[0])
+        return np.array([a, -a, 0])
 
 class JacobianTests(unittest.TestCase):
     def setUp(self):
@@ -97,12 +123,20 @@ class MoreJacobianTests(unittest.TestCase):
         q = np.array([0,0])
         npt.assert_allclose(self._getJ(q), self._expectedJ(q))
 
+    def test_4(self):
+        q = np.array([0.25,17.0])
+        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+
     def _expectedJ(self, x):
-        return np.array([[-3-4*5*x[0], 0,],
-                         [2*5*x[0], -3,]])
+        k_r = self.model.get("k_r")
+        d = self.model.get("d")
+        k_d = self.model.get("k_d")
+
+        return np.array([[-d-4*k_d*x[0], 0,],
+                         [2*k_d*x[0], -d,]])
 
     def _getJ(self, y):
-        return self.model._get_fprime()(y)
+        return self.model._get_fprime()(np.sqrt(y))
 
 class MMJacobianTests(unittest.TestCase):
     def setUp(self):
@@ -132,7 +166,7 @@ class MMJacobianTests(unittest.TestCase):
                          [ 0,   0, -k2]])
 
     def _getJ(self, y):
-        return self.model._get_fprime()(y)
+        return self.model._get_fprime()(np.sqrt(y))
 
 
 
@@ -211,12 +245,10 @@ class MMSolveTests(unittest.TestCase):
 
     def test_solve_without_J(self):
         out = self.model.solve(False)
-        print("withoutJ {}".format(out))
         npt.assert_allclose(out, self.solution)
 
     def test_solve_with_J(self):
         out = self.model.solve(True)
-        print("withJ {}".format(out))
         npt.assert_allclose(out, self.solution)
 
 if __name__ == "__main__":
