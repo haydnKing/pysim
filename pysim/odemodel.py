@@ -137,8 +137,17 @@ class ODEModel:
                 len(self.params), len(params)))
         self.params.values = np.array(params)
 
-    def solveForParams(self, params, use_fprime=True):
+    def setAllSpecies(self, species):
+        """Set all initial conditions"""
+        if len(self.species) != len(species):
+            raise ValueError("Expected {} species, got {}".format(
+                len(self.species), len(species)))
+        self.species.values = np.array(species)
+
+    def solveForParams(self, params, initial_conditions=None, use_fprime=True):
         self.setAllParams(params)
+        if initial_conditions:
+            self.setAllSpecies(initial_conditions)
         return self.solve(use_fprime)
 
     def get(self, name):
@@ -152,8 +161,6 @@ class ODEModel:
         else:
             raise KeyError("\"{}\" is not a known species or parameter"
                            .format(name))
-
-
 
     def solve(self, use_fprime=True):
         """Calculate the steady state solution of the system of equations"""
@@ -172,7 +179,8 @@ class ODEModel:
             if use_fprime:
                 return self.solve(use_fprime=False)
             else:
-                print("Couldn't optimize, got: {}".format(mesg))
+                #give up
+                return np.array([np.NaN,]*len(self.species))
 
         return np.square(out)
 
