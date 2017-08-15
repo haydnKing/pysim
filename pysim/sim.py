@@ -95,7 +95,48 @@ class Sim:
             self.query = query.copy()
 
     def solve(self, use_jacobian=True):
-        o = np.apply_along_axis(self.model.solveForParams, 1, self.query, use_jacobian)
+        o = np.apply_along_axis(self.model.solveForParams, 
+                                1, 
+                                self.query, 
+                                None,
+                                use_jacobian)
+
+        print("Round 1: Solved {} of {}".format(
+            int(np.sum([1 for row in range(o.shape[0]) 
+                    if not np.any(np.isnan(o[row,:]))])), 
+            o.shape[0]))
+
+        #Try to fill in some NaNs
+        last_solved = -1
+        for row in range(o.shape[0]):
+            if np.any(np.isnan(o[row,:])) and row >= 0:
+                #try solving with the last solution as an initial guess
+                o[row, :] = self.model.solveForParams(self.query[row,:],
+                                                      o[last_solved,:],
+                                                      use_jacobian)
+            else:
+                last_solved = row
+
+        print("Round 2: Solved {} of {}".format(
+            int(np.sum([1 for row in range(o.shape[0]) 
+                    if not np.any(np.isnan(o[row,:]))])), 
+            o.shape[0]))
+
+        #Try to fill in some NaNs
+        last_solved = -1
+        for row in reversed(range(o.shape[0])):
+            if np.any(np.isnan(o[row,:])) and row >= 0:
+                #try solving with the last solution as an initial guess
+                o[row, :] = self.model.solveForParams(self.query[row,:],
+                                                      o[last_solved,:],
+                                                      use_jacobian)
+            else:
+                last_solved = row
+
+        print("Round 3: Solved {} of {}".format(
+            int(np.sum([1 for row in range(o.shape[0]) 
+                    if not np.any(np.isnan(o[row,:]))])), 
+            o.shape[0]))
 
         df = pd.DataFrame(
             data=np.append(self.query,o,1),

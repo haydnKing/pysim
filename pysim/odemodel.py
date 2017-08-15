@@ -146,7 +146,7 @@ class ODEModel:
 
     def solveForParams(self, params, initial_conditions=None, use_fprime=True):
         self.setAllParams(params)
-        if initial_conditions:
+        if initial_conditions is not None:
             self.setAllSpecies(initial_conditions)
         return self.solve(use_fprime)
 
