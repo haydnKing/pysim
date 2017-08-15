@@ -2,6 +2,7 @@
 from context import pysim
 
 import unittest, os.path, numpy as np, numpy.testing as npt
+import scipy.optimize
 
 test_data = os.path.join(os.path.dirname(__file__), "data/")
 
@@ -75,99 +76,77 @@ class GoverningFunctionTests(unittest.TestCase):
         a = q[1] * krv - 2 * kfw * q[0] - kcat*q[2]*q[0] / (km + q[0])
         return np.array([a, -a, 0])
 
-class JacobianTests(unittest.TestCase):
+class NumericalJacobianTest(unittest.TestCase):
     def setUp(self):
-         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
-                                                           "jacobiantest.model"))
+        self.load_model("jacobiantest.model")
 
-    def test_1(self):
-        J = self._getJ(np.array([1,1]))
-        npt.assert_allclose(J, np.array([[ 0,  0],
-                                         [10, -7],
-                                         [ 3,  0],
-                                         [ 0,  3]]))
+    def test_jac(self):
 
-    def test_2(self):
-        J = self._getJ(np.array([1,18]))
-        npt.assert_allclose(J, np.array([[ 0,  0],
-                                         [10, -7],
-                                         [ 3,  0],
-                                         [ 0,  3]]))
+        points = [[1.5, 1.5],
+                  [27.0, 12.],
+                  [-1.5, 1.5],]
 
-    def test_3(self):
-        J = self._getJ(np.array([3,1]))
-        npt.assert_allclose(J, np.array([[ 0,  0],
-                                         [30, -7],
-                                         [ 3,  0],
-                                         [ 0,  3]]))
+        self.check_points(points)
 
 
-    def _getJ(self, y):
-        return np.array([r.getJacobianEquation()(y) 
-                         for r in self.model.reactions])
+    def load_model(self, name):
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, name))
+        self.f = self.model._get_f()
+        self.J = self.model._get_fprime()
 
-class MoreJacobianTests(unittest.TestCase):
+
+    def check_points(self, points):
+        for x in points:
+            J_num = self.calc_J(x)
+            J_eval= self.J(x)
+
+            npt.assert_allclose(J_eval, 
+                                J_num,
+                                atol=1e-6,
+                                err_msg="at point {}".format(x))
+
+
+
+    def calc_J(self, x):
+        eps = np.sqrt(np.finfo(float).eps)
+
+        funcs = lambda i: (lambda x: self.f(x)[i])
+
+        J = np.array([scipy.optimize.approx_fprime(x, funcs(i), eps) 
+                      for i in range(len(x))])
+
+        return J
+
+
+
+class MoreJacobianTests(NumericalJacobianTest):
     def setUp(self):
-         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
-                                                           "solvetest1.model"))
+        self.load_model("solvetest1.model")
 
-    def test_1(self):
-        q = np.array([1,1])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+    def test_jac(self):
 
-    def test_2(self):
-        q = np.array([5,1])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+        points = [[1., 1.],
+                  [5., 1.],
+                  [0., 0.],
+                  [0.25, 17.],
+                 ]
 
-    def test_3(self):
-        q = np.array([0,0])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+        self.check_points(points)
 
-    def test_4(self):
-        q = np.array([0.25,17.0])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
 
-    def _expectedJ(self, x):
-        k_r = self.model.get("k_r")
-        d = self.model.get("d")
-        k_d = self.model.get("k_d")
-
-        return np.array([[-d-4*k_d*x[0], 0,],
-                         [2*k_d*x[0], -d,]])
-
-    def _getJ(self, y):
-        return self.model._get_fprime()(np.sqrt(y))
-
-class MMJacobianTests(unittest.TestCase):
+class MMJacobianTests(NumericalJacobianTest):
     def setUp(self):
-         self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
-                                                           "MMJacobiantest.model"))
+        self.load_model("MMJacobiantest.model")
 
-    def test_1(self):
-        q = np.array([1,1,1])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+    def test_jac(self):
 
-    def test_2(self):
-        q = np.array([0,0,0])
-        npt.assert_allclose(self._getJ(q), self._expectedJ(q))
+        points = [[1., 1., 1.],
+                  [0., 0., 0.],
+                  [0., 0., 5.],
+                  [0.25, 17., 5.2],
+                 ]
 
-
-    def _expectedJ(self, x):
-        k1 = self.model.params.getValueByName("k1")
-        k2 = self.model.params.getValueByName("k2")
-        kc = self.model.params.getValueByName("k_cat")
-        km = self.model.params.getValueByName("k_m")
-
-        q = kc*km*x[2]/((km+x[0])*(km+x[0]))
-        r = kc*x[0]/(km+x[0])
-
-        return np.array([[-q,   0, -r ],
-                         [ q, -k2,  r ],
-                         [ 0,   0, -k2]])
-
-    def _getJ(self, y):
-        return self.model._get_fprime()(np.sqrt(y))
-
+        self.check_points(points)
 
 
 class SolveTests(unittest.TestCase):

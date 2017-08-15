@@ -162,10 +162,17 @@ class ODEModel:
         if use_fprime:
             fprime = self._get_fprime()
 
-        out = fsolve(self._get_f(), 
-                     self.species.values,
-                     fprime=fprime,
-                     col_deriv=False)
+        (out, info, ier, mesg) = fsolve(self._get_f(), 
+                            self.species.values,
+                            fprime=fprime,
+                            col_deriv=False,
+                            full_output=True)
+
+        if ier != 1:
+            if use_fprime:
+                return self.solve(use_fprime=False)
+            else:
+                print("Couldn't optimize, got: {}".format(mesg))
 
         return np.square(out)
 
