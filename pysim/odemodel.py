@@ -90,10 +90,8 @@ class ODEModel:
     def _get_f(self):
         f = self._get_unwrapped_f()
 
-        def g(y):
-            z = np.square(y)
-            return f(z)
-
+        def g(z):
+            return f(np.square(z))
         return g
 
     def _get_unwrapped_fprime(self):
@@ -109,12 +107,32 @@ class ODEModel:
     
     def _get_fprime(self):
         fp = self._get_unwrapped_fprime()
+        f = self._get_unwrapped_f()
+        eps = np.sqrt(np.finfo(float).eps)
+        eps_v = [np.zeros(len(self.species)) for i in range(len(self.species))]
+        for i in range(len(self.species)):
+            eps_v[i][i] = eps
 
-        def g(y):
-            z = np.square(y)
-            R = fp(z)
-            for i in range(R.shape[0]):
-                R[:,i] *= 2 * y[i]
+        def g(z):
+            x = np.square(z)
+            R = fp(x)
+            for i in range(len(z)):
+                R[:,i] *= 2 * z[i]
+            #F = f(x)
+            #for n in range(R.shape[0]):
+            #    for m in range(R.shape[1]):
+            #        if z[n] != 0.:
+            #            s = F[m] / (2 * z[n] * z[n])
+            #        else:
+            #            P = f(x + eps_v[m])[m]
+            #            if np.abs(P) < 1:
+            #                s = 0.
+            #            elif P > 0:
+            #                s = np.finfo(float).max
+            #            else:
+            #                s = np.finfo(float).min
+            #        R[n,m] -= s  
+
             return R
 
         return g

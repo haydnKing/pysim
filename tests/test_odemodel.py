@@ -55,15 +55,27 @@ class GoverningFunctionTests(unittest.TestCase):
          self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
                                                            "ratetest.model"))
 
-    def test_governing_fn(self):
+    def test_unwrapped(self):
         tests = [np.array([1.0,1.0,1.0]),
                  np.array([2.0,1.0,1.0]),
                  np.array([1.0,2.0,0.0]),
                  np.array([1.0,1.0,2.0]),]
+        f = self.model._get_unwrapped_f()
+        for q in tests:
+            npt.assert_allclose(f(q), 
+                                self._rate(q), 
+                                atol=10e-12,
+                                err_msg="q = {}".format(q))
+
+    def test_wrapped(self):
+        tests = [np.array([1.0,1.0,1.0]),
+                 np.array([2.0,1.0,1.0]),
+                 np.array([1.0,-2.0,0.0]),
+                 np.array([1.0,1.0,2.0]),]
         f = self.model._get_f()
         for q in tests:
-            npt.assert_allclose(f(np.sqrt(q)), 
-                                self._rate(q), 
+            npt.assert_allclose(f(q), 
+                                self._rate(np.square(q)), 
                                 atol=10e-12,
                                 err_msg="q = {}".format(q))
 
@@ -83,7 +95,8 @@ class NumericalJacobianTest(unittest.TestCase):
     def test_jac(self):
 
         points = [[1.5, 1.5],
-                  [27.0, 12.],
+                  [1.5, 1.0],
+                  [27.0, -12.],
                   [-1.5, 1.5],]
 
         self.check_points(points)
@@ -96,24 +109,22 @@ class NumericalJacobianTest(unittest.TestCase):
 
 
     def check_points(self, points):
-        for x in points:
-            J_num = self.calc_J(x)
-            J_eval= self.J(x)
+        for z in points:
+            J_num = self.calc_J(z)
+            J_eval= self.J(z)
 
             npt.assert_allclose(J_eval, 
                                 J_num,
                                 atol=1e-6,
-                                err_msg="at point {}".format(x))
+                                err_msg="at point {}".format(z))
 
-
-
-    def calc_J(self, x):
+    def calc_J(self, z):
         eps = np.sqrt(np.finfo(float).eps)
 
-        funcs = lambda i: (lambda x: self.f(x)[i])
+        funcs = lambda i: (lambda z: self.f(z)[i])
 
-        J = np.array([scipy.optimize.approx_fprime(x, funcs(i), eps) 
-                      for i in range(len(x))])
+        J = np.array([scipy.optimize.approx_fprime(z, funcs(i), eps) 
+                      for i in range(len(z))])
 
         return J
 
