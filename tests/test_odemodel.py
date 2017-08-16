@@ -75,7 +75,7 @@ class GoverningFunctionTests(unittest.TestCase):
         f = self.model._get_f()
         for q in tests:
             npt.assert_allclose(f(q), 
-                                self._rate(np.square(q)), 
+                                self._rate(np.square(q))/(2*q), 
                                 atol=10e-12,
                                 err_msg="q = {}".format(q))
 
@@ -97,7 +97,9 @@ class NumericalJacobianTest(unittest.TestCase):
         points = [[1.5, 1.5],
                   [1.5, 1.0],
                   [27.0, -12.],
-                  [-1.5, 1.5],]
+                  [-1.5, 1.5],
+                  [0., 1.],
+                 ]
 
         self.check_points(points)
 
@@ -110,13 +112,23 @@ class NumericalJacobianTest(unittest.TestCase):
 
     def check_points(self, points):
         for z in points:
-            J_num = self.calc_J(z)
-            J_eval= self.J(z)
+            J_num = self.set_inf(self.calc_J(np.array(z)))
+            J_eval= self.set_inf(self.J(np.array(z)))
 
             npt.assert_allclose(J_eval, 
                                 J_num,
+                                rtol=1e-4,
                                 atol=1e-6,
                                 err_msg="at point {}".format(z))
+
+    def set_inf(self, mat, max_val = 1e10):
+        """Assume all numbers greater than max_val are equal"""
+        for m in range(mat.shape[0]):
+            for n in range(mat.shape[1]):
+                if np.abs(mat[m,n]) > max_val:
+                    mat[m,n] = np.sign(mat[m,n]) * max_val
+
+        return mat
 
     def calc_J(self, z):
         eps = np.sqrt(np.finfo(float).eps)
@@ -138,7 +150,7 @@ class MoreJacobianTests(NumericalJacobianTest):
 
         points = [[1., 1.],
                   [5., 1.],
-                  [0., 0.],
+                  [0., 1.],
                   [0.25, 17.],
                  ]
 
@@ -153,7 +165,7 @@ class MMJacobianTests(NumericalJacobianTest):
 
         points = [[1., 1., 1.],
                   [0., 0., 0.],
-                  [0., 0., 5.],
+                  [1., 0., 5.],
                   [0.25, 17., 5.2],
                  ]
 

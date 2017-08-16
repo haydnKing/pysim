@@ -89,9 +89,13 @@ class ODEModel:
 
     def _get_f(self):
         f = self._get_unwrapped_f()
+        eps = np.sqrt(np.finfo(float).eps)
 
         def g(z):
-            return f(np.square(z))
+            for i in range(len(z)):
+                if z[i] == 0:
+                    z[i] = eps
+            return f(np.square(z)) / (z * 2)
         return g
 
     def _get_unwrapped_fprime(self):
@@ -106,34 +110,21 @@ class ODEModel:
         return j
     
     def _get_fprime(self):
-        fp = self._get_unwrapped_fprime()
-        f = self._get_unwrapped_f()
-        eps = np.sqrt(np.finfo(float).eps)
-        eps_v = [np.zeros(len(self.species)) for i in range(len(self.species))]
-        for i in range(len(self.species)):
-            eps_v[i][i] = eps
+        j = self._get_unwrapped_fprime()
+        f = self._get_f()
 
         def g(z):
             x = np.square(z)
-            R = fp(x)
-            for i in range(len(z)):
-                R[:,i] *= 2 * z[i]
-            #F = f(x)
-            #for n in range(R.shape[0]):
-            #    for m in range(R.shape[1]):
-            #        if z[n] != 0.:
-            #            s = F[m] / (2 * z[n] * z[n])
-            #        else:
-            #            P = f(x + eps_v[m])[m]
-            #            if np.abs(P) < 1:
-            #                s = 0.
-            #            elif P > 0:
-            #                s = np.finfo(float).max
-            #            else:
-            #                s = np.finfo(float).min
-            #        R[n,m] -= s  
+            J = j(x)
+            F = f(z)
+            for m in range(J.shape[0]):
+                for n in range(J.shape[1]):
+                    if n == m:
+                        J[m,n] -= F[m] / z[m]
+                    else:
+                        J[m,n] *= z[n] / z[m]
 
-            return R
+            return J
 
         return g
 
