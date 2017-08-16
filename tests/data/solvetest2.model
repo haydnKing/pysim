@@ -1,5 +1,5 @@
-species p=1.0,r
-func q = 1-p
+species p=1.0, q, r
+constraint p + q - 1.0
 param kp=1.0, mu=0.1, kb=0.5
 
 p --[kp]> p + r

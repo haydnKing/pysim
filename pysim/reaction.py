@@ -147,52 +147,33 @@ class Reaction:
     def getStoiciometry(self):
         return self.r_stoic - self.l_stoic
 
-    @staticmethod
-    def _get_species_expansion(species_names, functions):
-        if species_names is None or len(functions) == 0:
-            return lambda species: species
-        funcs = [compile(f, '<string>', 'eval') for f in functions.values]
-        gb = {'sqrt': np.sqrt, 'log':np.log, 'exp':np.exp}
-
-        def fn(species):
-            d = {k: v for k,v in zip(species_names, species)}
-            return np.append(species, 
-                             [eval(f, gb, d) for f in funcs])
-        return fn
-
-    def getRateEquation(self, species_names=None, functions=None):
+    def getRateEquation(self):
         """Return a function which calculates the rates of change for each 
             species due to this reaction given the current concentrations y"""
         f_fw = self._get_rateeq(self.k_fw, self.params)
         f_rv = self._get_rateeq(self.k_rv, self.params)
 
-        expand = self._get_species_expansion(species_names, functions)
-
-        def fn(species):
-            s = expand(species)
+        def fn(x):
             #find the forward rate of the reaction
-            K_fw = f_fw(s, np.product(np.power(s,self.l_stoic)))
+            K_fw = f_fw(x, np.product(np.power(x,self.l_stoic)))
             #if reversable, subtract rate of reverse reaction
-            K_fw -= f_rv(s, np.product(np.power(s,self.r_stoic)))
+            K_fw -= f_rv(x, np.product(np.power(x,self.r_stoic)))
 
             return K_fw
 
         return fn
 
-    def getJacobianEquation(self, species_names=None, functions=None):
+    def getJacobianEquation(self):
         """Return a function which calculates the rates of change for each 
             species due to this reaction given the current concentrations y"""
         f_fw = self._get_jacobian(self.k_fw, self.params, self.l_stoic)
         f_rv = self._get_jacobian(self.k_rv, self.params, self.r_stoic)
 
-        expand = self._get_species_expansion(species_names, functions)
-
-        def fn(species):
-            s = expand(species)
+        def fn(x):
             #find the forward part of the jacobian
-            J = f_fw(s)
+            J = f_fw(x)
             #if reversable, subtract the reverse part of the jacobian
-            J -= f_rv(s)
+            J -= f_rv(x)
 
             return J 
 

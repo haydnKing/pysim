@@ -214,7 +214,7 @@ class SolveTests2(unittest.TestCase):
         r = (-b + np.sqrt(b*b-4*a*c))/ (2.*a)
         p = 1. / (1 + r * kb / mu)
 
-        return np.array([p,r])
+        return np.array([p,1-p,r])
 
 
     def test_solve_without_J(self):

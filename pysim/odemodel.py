@@ -1,5 +1,5 @@
 from scipy.integrate import odeint
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, approx_fprime
 import numpy as np, re
 
 from .reaction import Reaction
@@ -7,28 +7,25 @@ from .symbols import SymbolTable
 from .exceptions import *
 
 class ODEModel:
-    def __init__(self, species, params, functions, reactions):
+    def __init__(self, species, params, constraints, reactions):
         self.species = species
-        self.functions = functions
+        self.constraints = constraints
         self.params = params
         self.reactions = reactions
 
     @classmethod
     def fromFile(cls, filename):
         species = SymbolTable(float, 1.0)
-        functions = SymbolTable(str, "0.0")
+        constraints = []
         params = SymbolTable(float, 0.0)
         reactions = []
 
         kw = {'species': species,
-              'func': functions,
               'param': params,
               'params': params,
              }
 
         eq = re.compile(r'([^\s=]+)\s*(?:=\s*(.+))?')
-
-        seen_reaction = False
 
         with open(filename) as f:
             for i,line in enumerate(f):
@@ -41,37 +38,38 @@ class ODEModel:
                     #find species and params
                     syms = line.split()
                     if syms[0] in kw.keys():
-                        if syms[0] == "species" and seen_reaction:
-                            raise ParseError("Cannot define species after reaction")
                         for d in " ".join(syms[1:]).split(','):
                             m = eq.match(d.strip())
                             if not m:
                                 raise SyntaxParseError(syms[0], d.strip())
                             name, value = m.groups()
                             if (name in species or
-                                name in functions or
                                 name in params):
                                 raise DuplicateNameError(name)
                             kw[syms[0]].addSymbol(name, value)
 
+                    elif syms[0] == "constraint":
+                        c = " ".join(syms[1:])
+                        constraints.append((c, compile(c, '<string>', 'eval')))
+
                     else: #reaction
-                        seen_reaction = True
                         reactions.append(
                             Reaction.fromStr(line, 
                                              params, 
-                                             species.merge(functions)))
+                                             species))
                 except ParseError as p:
                     p.setLine(i+1)
                     raise
-        return cls(species, params, functions, reactions)
+        return cls(species, params, constraints, reactions)
 
     def __str__(self):
         lines = [
             'param ' + str(self.params),
             'species ' + str(self.species),
         ]
-        #if self.functions:
-        #    lines += str(self.functions)
+        if self.constraints:
+            for c in self.constraints:
+                lines.append("constraint " + c[0])
 
         lines += [str(r) for r in self.reactions]
         return '\n'.join(lines) + '\n'
@@ -79,50 +77,77 @@ class ODEModel:
     def _get_unwrapped_f(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        rates = [r.getRateEquation(self.species.names,
-                                   self.functions) 
-                 for r in self.reactions]
+        rates = [r.getRateEquation() for r in self.reactions]
         def f(y):
             ret = np.array([r(y) for r in rates])
             return S.dot(ret)[:len(self.species)]
         return f
 
+    def _get_constraints(self):
+        if not self.constraints:
+            return []
+
+        glob = {'sqrt': np.sqrt,
+                'log': np.log,}
+        L = len(self.constraints)
+
+        def f(constraint):
+            return lambda x: eval(constraint,
+                                  glob,
+                                  {k:v for k,v in zip(self.species.names, x)})
+
+        return [f(c[1]) for c in self.constraints]
+
     def _get_f(self):
         f = self._get_unwrapped_f()
+        C = self._get_constraints()
         eps = np.sqrt(np.finfo(float).eps)
+        S = len(self.species)
+        L = len(self.constraints)
 
-        def g(z):
-            for i in range(len(z)):
+        def g(y):
+            z = y[:S]
+            for i in range(S):
                 if z[i] == 0:
                     z[i] = eps
-            return f(np.square(z)) / (z * 2)
+            x = np.square(z)
+            return np.append(f(x) / (z * 2),
+                             [c(x) for c in C])
         return g
 
     def _get_unwrapped_fprime(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        J = [r.getJacobianEquation(self.species.names,
-                                   self.functions) 
-                  for r in self.reactions]
+        J = [r.getJacobianEquation() for r in self.reactions]
         def j(y):
-            return S.dot(np.array([r(y) for r in J]))[:len(self.species),
-                                                      :len(self.species)]
+            return S.dot(np.array([r(y) for r in J]))
+                                                     
         return j
     
     def _get_fprime(self):
         j = self._get_unwrapped_fprime()
         f = self._get_f()
+        C = self._get_constraints()
+        S = len(self.species)
+        L = len(self.constraints)
+        eps = np.sqrt(np.finfo(float).eps)
 
-        def g(z):
+        def g(y):
+            z = y[:S]
             x = np.square(z)
-            J = j(x)
+            J = np.zeros((S+L, S+L))
+            J[:S,:S] = j(x)
             F = f(z)
-            for m in range(J.shape[0]):
-                for n in range(J.shape[1]):
+            for m in range(S):
+                for n in range(S):
                     if n == m:
                         J[m,n] -= F[m] / z[m]
                     else:
                         J[m,n] *= z[n] / z[m]
+
+            if L:
+                J[S:,:S] = np.array([approx_fprime(x, C[i], eps) 
+                                     for i in range(L)])
 
             return J
 
@@ -163,8 +188,6 @@ class ODEModel:
         """get params or species initial conditions"""
         if name in self.params:
            return self.params.getValueByName(name)
-        elif name in self.functions:
-           return self.functions.getValueByName(name)
         elif name in self.species:
            return self.species.getValueByName(name)
         else:
@@ -178,11 +201,13 @@ class ODEModel:
         if use_fprime:
             fprime = self._get_fprime()
 
+        initial = np.append(self.species.values, [1.0,]*len(self.constraints))
+
         (out, info, ier, mesg) = fsolve(self._get_f(), 
-                            self.species.values,
-                            fprime=fprime,
-                            col_deriv=False,
-                            full_output=True)
+                                        initial,
+                                        fprime=fprime,
+                                        col_deriv=False,
+                                        full_output=True)
 
         if ier != 1:
             if use_fprime:
@@ -191,7 +216,7 @@ class ODEModel:
                 #give up
                 return np.array([np.NaN,]*len(self.species))
 
-        return np.square(out)
+        return np.square(out[:len(self.species)])
 
 
 
