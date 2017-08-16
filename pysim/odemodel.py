@@ -1,5 +1,6 @@
 from scipy.integrate import odeint
 from scipy.optimize import fsolve, approx_fprime
+from scipy.integrate import odeint
 import numpy as np, re
 
 from .reaction import Reaction
@@ -15,7 +16,7 @@ class ODEModel:
 
     @classmethod
     def fromFile(cls, filename):
-        species = SymbolTable(float, 1.0)
+        species = SymbolTable(float, 0.0)
         constraints = []
         params = SymbolTable(float, 0.0)
         reactions = []
@@ -78,8 +79,8 @@ class ODEModel:
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
         rates = [r.getRateEquation() for r in self.reactions]
-        def f(y):
-            ret = np.array([r(y) for r in rates])
+        def f(x):
+            ret = np.array([r(x) for r in rates])
             return S.dot(ret)[:len(self.species)]
         return f
 
@@ -194,6 +195,18 @@ class ODEModel:
             raise KeyError("\"{}\" is not a known species or parameter"
                            .format(name))
 
+    def integrate(self, x_0, time=1000.0):
+        f = self._get_unwrapped_f()
+        J = self._get_unwrapped_fprime()
+
+        y, info = odeint(lambda x,t: f(x),
+                         x_0,
+                         t = np.array([0, time]),
+                         full_output=True,
+                         Dfun=lambda x,t: J(x))
+
+        return y[-1,:]
+
     def solve(self, use_fprime=True):
         """Calculate the steady state solution of the system of equations"""
         
@@ -201,7 +214,8 @@ class ODEModel:
         if use_fprime:
             fprime = self._get_fprime()
 
-        initial = np.append(self.species.values, [1.0,]*len(self.constraints))
+        xi = self.integrate(self.species.values)
+        initial = np.append(np.sqrt(xi), [1.0,]*len(self.constraints))
 
         (out, info, ier, mesg) = fsolve(self._get_f(), 
                                         initial,

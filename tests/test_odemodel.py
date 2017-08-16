@@ -225,6 +225,22 @@ class SolveTests2(unittest.TestCase):
         out = self.model.solve(True)
         npt.assert_allclose(out, self._solution())
 
+class SolveTests3(unittest.TestCase):
+    def setUp(self):
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                          "solvetest3.model"))
+         
+    def test_solve_without_J(self):
+        out = self.model.solve(False)
+        self.assertFalse(np.any(np.isnan(out)),
+                         "Got \'solution\' {}".format(out))
+
+#    def test_solve_with_J(self):
+#        out = self.model.solve(True)
+#        self.assertFalse(np.any(np.isnan(out)),
+#                         "Got \'solution\' {}".format(out))
+
+
 class SetTests(SolveTests):
 
     def test_setSolve(self):

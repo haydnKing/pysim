@@ -1,0 +1,16 @@
+#model without arsenic
+#p = free promoter
+#r = arsR
+#s = arsR2
+#t = bound promoter
+
+species p=1.0,q,r,s
+constraint q + p - 1.0
+param kp=0.5128605099911331, kd_f=10.0, kd_r=0.001, kr_f=1000.0, kr_r=0.001, mu=0.0466855987808731
+
+p --[kp]> p + r
+r --[mu]> 
+2r <[kd_r]--[kd_f]> s
+s --[mu]>
+s + p <[kr_r]--[kr_f]> q
+q --[mu]> p
