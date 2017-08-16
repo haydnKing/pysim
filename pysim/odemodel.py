@@ -8,22 +8,25 @@ from .symbols import SymbolTable
 from .exceptions import *
 
 class ODEModel:
-    def __init__(self, species, params, constraints, reactions):
+    def __init__(self, species, params, consts, constraints, reactions):
         self.species = species
         self.constraints = constraints
         self.params = params
+        self.consts = consts
         self.reactions = reactions
 
     @classmethod
     def fromFile(cls, filename):
         species = SymbolTable(float, 0.0)
-        constraints = []
+        consts = SymbolTable(float, 0.0)
         params = SymbolTable(float, 0.0)
+        constraints = []
         reactions = []
 
         kw = {'species': species,
               'param': params,
               'params': params,
+              'const': consts,
              }
 
         eq = re.compile(r'([^\s=]+)\s*(?:=\s*(.+))?')
@@ -57,11 +60,12 @@ class ODEModel:
                         reactions.append(
                             Reaction.fromStr(line, 
                                              params, 
-                                             species))
+                                             species,
+                                             consts))
                 except ParseError as p:
                     p.setLine(i+1)
                     raise
-        return cls(species, params, constraints, reactions)
+        return cls(species, params, consts, constraints, reactions)
 
     def __str__(self):
         lines = [
@@ -78,7 +82,7 @@ class ODEModel:
     def _get_unwrapped_f(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        rates = [r.getRateEquation() for r in self.reactions]
+        rates = [r.getRateEquation(self.consts) for r in self.reactions]
         def f(x):
             ret = np.array([r(x) for r in rates])
             return S.dot(ret)[:len(self.species)]
@@ -159,6 +163,8 @@ class ODEModel:
         for k,v in kwargs.items():
             if k in self.params:
                self.params.setValueByName(k,v)
+            elif k in self.consts:
+                self.consts.setValueByName(k,v)
             elif k in self.species:
                 self.species.setValueByName(k,v)
             else:

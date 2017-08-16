@@ -26,24 +26,31 @@ class ReactionRateTests(unittest.TestCase):
                                                            "ratetest.model"))
 
     def test_fw_reaction(self):
-        fn = self.model.reactions[0].getRateEquation()
+        fn = self.model.reactions[0].getRateEquation(self.model.consts)
         tests = [([1,1,1], 1.0),
                  ([1,2,2], 1.0),
                  ([7,2,2], 7.0),]
         self._helper(fn, tests)
 
     def test_reversible_reaction(self):
-        fn = self.model.reactions[1].getRateEquation()
+        fn = self.model.reactions[1].getRateEquation(self.model.consts)
         tests = [([1,1,1],  0.0),
                  ([1,2,2], -1.0),
                  ([7,2,2],  5.0),]
         self._helper(fn, tests)
 
     def test_MM_reaction(self):
-        fn = self.model.reactions[2].getRateEquation()
+        fn = self.model.reactions[2].getRateEquation(self.model.consts)
         tests = [([1,1,1], 0.5),
                  ([1,2,2], 1.0),
                  ([7,2,2], 2.8),]
+        self._helper(fn, tests)
+
+    def test_const_reaction(self):
+        fn = self.model.reactions[3].getRateEquation(self.model.consts)
+        tests = [([1,1,1], 5.0),
+                 ([1,2,2], 5.0),
+                 ([7,2,2], 5.0),]
         self._helper(fn, tests)
 
     def _helper(self, fn, tests):
@@ -53,7 +60,7 @@ class ReactionRateTests(unittest.TestCase):
 class GoverningFunctionTests(unittest.TestCase):
     def setUp(self):
          self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
-                                                           "ratetest.model"))
+                                                           "govtest.model"))
 
     def test_unwrapped(self):
         tests = [np.array([1.0,1.0,1.0]),

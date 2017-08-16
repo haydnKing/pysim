@@ -1,9 +1,7 @@
 param k_fw=1.0, k_rv=1.0, k_cat=2.0, k_m =3.0
 species a,b,c
-const C=5
 
-a --[k_fw]> b + C
+a --[k_fw]> b 
 a <[k_rv]--[k_fw]> b
 a --[c, k_cat, k_m]> b
-C --[k_fw]> a
 

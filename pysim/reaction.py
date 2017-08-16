@@ -6,7 +6,15 @@ class Reaction:
     _reaction = re.compile(r"(?:<\[(.+)\])?--\[(.+)\]>")
     _component = re.compile(r"(\d+)?\s*([a-zA-Z_^][a-zA-Z0-9_\{\}^]*)")
     """A reaction within the model"""
-    def __init__(self, params, species, l_stoic, r_stoic, k_fw, k_rv=None):
+    def __init__(self, 
+                 params, 
+                 species, 
+                 l_stoic, 
+                 l_const, 
+                 r_stoic, 
+                 r_const, 
+                 k_fw, 
+                 k_rv=None):
         """Define the reaction.
             const_symbols: SymbolTable to use
             l_stoic: np.array of left hand stoichiometry
@@ -20,10 +28,12 @@ class Reaction:
         self.params = params
         self.species = species
         self.l_stoic = l_stoic
+        self.l_const = l_const
         self.r_stoic = r_stoic
+        self.r_const = r_const
 
     @classmethod
-    def fromStr(cls, line, params, species):
+    def fromStr(cls, line, params, species, consts):
         """Utility function to build reaction from string definition
         reaction_str = "[reactant_def]* reaction_spec [reactant_def]*"
         where:
@@ -38,9 +48,9 @@ class Reaction:
             raise ReactionError("No reaction spec found")
 
         #parse lhs
-        l_stoic = cls._parse_reactants(species, line[:rs.start()])
+        l_stoic, l_const = cls._parse_reactants(species, consts, line[:rs.start()])
         #parse rhs
-        r_stoic = cls._parse_reactants(species, line[rs.end():])
+        r_stoic, r_const = cls._parse_reactants(species, consts, line[rs.end():])
 
         #now parse the reaction spec
         k_rv = []
@@ -51,19 +61,22 @@ class Reaction:
         return Reaction(params, 
                         species,
                         l_stoic, 
-                        r_stoic, 
+                        l_const,
+                        r_stoic,
+                        r_const,
                         cls._parse_rateeq(k_fw, params, species), 
                         cls._parse_rateeq(k_rv, params, species))
     
     @classmethod
-    def _parse_reactants(cls, species, spec):
+    def _parse_reactants(cls, species, consts, spec):
         """parse a string of reactants
             species: species SymbolTable 
             spec: reactant string (e.g. "3f + 5g")
         """
         stoic = np.zeros(len(species))
+        c_stoic = np.zeros(len(consts))
         if not spec:
-            return stoic
+            return stoic, c_stoic
         #remove optional first '+'
         if spec[0] == '+':
             spec = spec[1:]
@@ -75,12 +88,23 @@ class Reaction:
                 raise ReactionError(
                     "Couldn't parse reaction component from \"{}\"".format(
                         symbol))
-            index = species.getIndexByName(m.groups()[1])
-            if m.groups()[0]:
-                stoic[index] += int(m.groups()[0])
+            name = m.groups()[1]
+            if name in species:
+                index = species.getIndexByName(name)
+                if m.groups()[0]:
+                    stoic[index] += int(m.groups()[0])
+                else:
+                    stoic[index] += 1
+            elif name in consts:
+                index = consts.getIndexByName(name)
+                if m.groups()[0]:
+                    c_stoic[index] += int(m.groups()[0])
+                else:
+                    c_stoic[index] += 1
             else:
-                stoic[index] += 1
-        return stoic
+                raise NameLookupError(name)
+
+        return stoic, c_stoic
 
     @staticmethod
     def _parse_rateeq(args, params, species):
@@ -98,17 +122,17 @@ class Reaction:
         raise ReactionError("Cannot parse reaction rate")
 
     @staticmethod
-    def _get_rateeq(args, params):
+    def _get_rateeq(args, params, const):
         """return a function which calculates 1directional rate"""
         if not args:
             return lambda y,s: 0
         if len(args) == 1:
             k = params.values[args[0]]
-            return lambda y,s: k * s
+            return lambda y,s: k * (s*const)
         e = args[0]
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
-        return lambda y,s: (y[e]*k_cat*s)/(k_m+s)
+        return lambda y,s: (y[e]*k_cat*(s*const))/(k_m+(s*const))
 
     @staticmethod
     def _get_jacobian(args, params, stoic):
@@ -147,11 +171,15 @@ class Reaction:
     def getStoiciometry(self):
         return self.r_stoic - self.l_stoic
 
-    def getRateEquation(self):
+    def getRateEquation(self, consts):
         """Return a function which calculates the rates of change for each 
             species due to this reaction given the current concentrations y"""
-        f_fw = self._get_rateeq(self.k_fw, self.params)
-        f_rv = self._get_rateeq(self.k_rv, self.params)
+        l_c = np.product(np.power(consts.values,self.l_const))
+        r_c = np.product(np.power(consts.values,self.r_const))
+        print("l_c = {}".format(l_c))
+        print("r_c = {}".format(r_c))
+        f_fw = self._get_rateeq(self.k_fw, self.params, l_c)
+        f_rv = self._get_rateeq(self.k_rv, self.params, r_c)
 
         def fn(x):
             #find the forward rate of the reaction
