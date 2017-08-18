@@ -6,7 +6,7 @@ class Sim:
     """Test a model under a variety of conditions"""
     def __init__(self, model):
         self.model = model
-        self.defaults = model.params.copy()
+        self.defaults = model.params.merge(model.consts)
         self.query = None
 
     @classmethod
@@ -85,6 +85,14 @@ class Sim:
         else:
             self.query = data
 
+    def setDefault(self, key, value):
+        self.model.set(key, value)
+
+    def setRatio(self, numerator, denomenator, ratio, product=1.0):
+        P = np.sqrt(product)
+        self.model.set(numerator, P * np.sqrt(ratio))
+        self.model.set(denomenator, P/np.sqrt(ratio))
+
     def addQuery(self, query):
         if query.shape[2] != self.numParameters():
             raise ValueError("Queries need {} parameters, not {}".format(
@@ -95,52 +103,32 @@ class Sim:
             self.query = query.copy()
 
     def solve(self, use_jacobian=True):
-        o = np.apply_along_axis(self.model.solveForParams, 
-                                1, 
-                                self.query, 
-                                None,
-                                use_jacobian)
 
-        print("Round 1: Solved {} of {}".format(
-            int(np.sum([1 for row in range(o.shape[0]) 
-                    if not np.any(np.isnan(o[row,:]))])), 
-            o.shape[0]))
+        print("kp = {}".format(self.model.get('kp')))
+        print("mu = {}".format(self.model.get('mu')))
 
-        #Try to fill in some NaNs
+        o = np.zeros((self.query.shape[0], len(self.model.species)))
         last_solved = -1
-        for row in range(o.shape[0]):
-            if np.any(np.isnan(o[row,:])) and row >= 0:
-                #try solving with the last solution as an initial guess
-                o[row, :] = self.model.solveForParams(self.query[row,:],
-                                                      o[last_solved,:],
-                                                      use_jacobian)
-            else:
-                last_solved = row
+        n_solved = 0
+        for i in range(o.shape[0]):
+            print("{} / {} / {}       ".format(i, 
+                                               n_solved, 
+                                               o.shape[0]), end="\r")
+            o[i,:], solved = self.model.solveForParams( 
+                self.query[i,:], 
+                o[last_solved,:] if last_solved > 0 else None,
+                use_jacobian)
+            if solved:
+                n_solved += 1
+                last_solved = i
 
-        print("Round 2: Solved {} of {}".format(
-            int(np.sum([1 for row in range(o.shape[0]) 
-                    if not np.any(np.isnan(o[row,:]))])), 
-            o.shape[0]))
-
-        #Try to fill in some NaNs
-        last_solved = -1
-        for row in reversed(range(o.shape[0])):
-            if np.any(np.isnan(o[row,:])) and row >= 0:
-                #try solving with the last solution as an initial guess
-                o[row, :] = self.model.solveForParams(self.query[row,:],
-                                                      o[last_solved,:],
-                                                      use_jacobian)
-            else:
-                last_solved = row
-
-        print("Round 3: Solved {} of {}".format(
-            int(np.sum([1 for row in range(o.shape[0]) 
-                    if not np.any(np.isnan(o[row,:]))])), 
-            o.shape[0]))
+        print("Solved {} of {}".format(n_solved, o.shape[0]))
 
         df = pd.DataFrame(
             data=np.append(self.query,o,1),
-            columns=self.model.params.names + self.model.species.names)
+            columns=(self.model.params.names + 
+                     self.model.consts.names +
+                     self.model.species.names))
 
         return df
 

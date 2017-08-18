@@ -176,8 +176,6 @@ class Reaction:
             species due to this reaction given the current concentrations y"""
         l_c = np.product(np.power(consts.values,self.l_const))
         r_c = np.product(np.power(consts.values,self.r_const))
-        print("l_c = {}".format(l_c))
-        print("r_c = {}".format(r_c))
         f_fw = self._get_rateeq(self.k_fw, self.params, l_c)
         f_rv = self._get_rateeq(self.k_rv, self.params, r_c)
 

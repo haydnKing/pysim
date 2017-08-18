@@ -1,4 +1,4 @@
-from scipy.integrate import odeint
+from scipy.integrate import ode
 from scipy.optimize import fsolve, approx_fprime
 from scipy.integrate import odeint
 import numpy as np, re
@@ -83,9 +83,9 @@ class ODEModel:
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
         rates = [r.getRateEquation(self.consts) for r in self.reactions]
+
         def f(x):
-            ret = np.array([r(x) for r in rates])
-            return S.dot(ret)[:len(self.species)]
+            return S.dot(np.array([r(x) for r in rates]))[:len(self.species)]
         return f
 
     def _get_constraints(self):
@@ -158,25 +158,25 @@ class ODEModel:
 
         return g
 
-    def set(self, **kwargs):
+    def set(self, k, v):
         """set params or species initial conditions"""
-        for k,v in kwargs.items():
-            if k in self.params:
-               self.params.setValueByName(k,v)
-            elif k in self.consts:
-                self.consts.setValueByName(k,v)
-            elif k in self.species:
-                self.species.setValueByName(k,v)
-            else:
-                raise KeyError("\"{}\" is not a known species or parameter"
-                               .format(k))
+        if k in self.params:
+           self.params.setValueByName(k,v)
+        elif k in self.consts:
+            self.consts.setValueByName(k,v)
+        elif k in self.species:
+            self.species.setValueByName(k,v)
+        else:
+            raise KeyError("\"{}\" is not a known species or parameter"
+                           .format(k))
 
     def setAllParams(self, params):
         """Set all parameters"""
-        if len(self.params) != len(params):
+        if len(self.params) + len(self.consts) != len(params):
             raise ValueError("Expected {} parameters, got {}".format(
-                len(self.params), len(params)))
-        self.params.values = np.array(params)
+                len(self.params)+len(self.consts), len(params)))
+        self.params.values = np.array(params[:len(self.params)])
+        self.consts.values = np.array(params[len(self.params):])
 
     def setAllSpecies(self, species):
         """Set all initial conditions"""
@@ -187,9 +187,7 @@ class ODEModel:
 
     def solveForParams(self, params, initial_conditions=None, use_fprime=True):
         self.setAllParams(params)
-        if initial_conditions is not None:
-            self.setAllSpecies(initial_conditions)
-        return self.solve(use_fprime)
+        return self.solve(initial_conditions, use_fprime)
 
     def get(self, name):
         """get params or species initial conditions"""
@@ -201,42 +199,62 @@ class ODEModel:
             raise KeyError("\"{}\" is not a known species or parameter"
                            .format(name))
 
-    def integrate(self, x_0, time=1000.0):
+    def integrate(self, x_0=None, tol=1e-6, max_time=10.0):
+        if x_0 is None:
+            x_0 = np.array(self.species.values)
+
         f = self._get_unwrapped_f()
         J = self._get_unwrapped_fprime()
 
-        y, info = odeint(lambda x,t: f(x),
-                         x_0,
-                         t = np.array([0, time]),
-                         full_output=True,
-                         Dfun=lambda x,t: J(x))
+        integrator = ode(lambda t,x: f(x))#, lambda t,x:J(x)) 
+        integrator.set_integrator('vode', 
+                                  method='bdf',
+                                  nsteps=1e4*(
+                                      len(self.species) + 
+                                      len(self.constraints))
+                                 )
+        integrator.set_initial_value(x_0, 0.0)
 
-        return y[-1,:]
+        dt = 1.0
+        x_last = x_0
+        #print("x_0 = {}".format(x_0))
+        while integrator.successful() and integrator.t + dt < max_time:
+            if np.linalg.norm(f(x_last)) < tol:
+                break
+            x_last = integrator.integrate(integrator.t+dt)
 
-    def solve(self, use_fprime=True):
+        return np.abs(x_last)
+
+    def solve(self, initial=None, use_fprime=True, attempts = 6):
         """Calculate the steady state solution of the system of equations"""
         
         fprime = None
         if use_fprime:
             fprime = self._get_fprime()
 
-        xi = self.integrate(self.species.values)
-        initial = np.append(np.sqrt(xi), [1.0,]*len(self.constraints))
+        if initial is None:
+            initial = self.species.values
+        initial = np.append(np.sqrt(initial),
+                            [1.0,] * len(self.constraints))
 
-        (out, info, ier, mesg) = fsolve(self._get_f(), 
-                                        initial,
-                                        fprime=fprime,
-                                        col_deriv=False,
-                                        full_output=True)
 
-        if ier != 1:
-            if use_fprime:
-                return self.solve(use_fprime=False)
-            else:
-                #give up
-                return np.array([np.NaN,]*len(self.species))
+        for attempt in range(attempts):
 
-        return np.square(out[:len(self.species)])
+            (out, info, ier, mesg) = fsolve(self._get_f(), 
+                                            initial,
+                                            fprime=fprime,
+                                            col_deriv=False,
+                                            full_output=True)
+
+            if ier == 1:
+                return np.square(out[:len(self.species)]), True
+                
+            xi = self.integrate(np.square(initial[:len(self.species)]), 
+                                max_time=10.0,
+                                tol=1e-6)
+            initial = np.append(np.sqrt(xi), [1.0,]*len(self.constraints))
+
+        return np.square(initial[:len(self.species)]), False
 
 
 

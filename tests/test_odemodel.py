@@ -242,10 +242,25 @@ class SolveTests3(unittest.TestCase):
         self.assertFalse(np.any(np.isnan(out)),
                          "Got \'solution\' {}".format(out))
 
-#    def test_solve_with_J(self):
-#        out = self.model.solve(True)
-#        self.assertFalse(np.any(np.isnan(out)),
-#                         "Got \'solution\' {}".format(out))
+    def test_solve_with_J(self):
+        out = self.model.solve(True)
+        self.assertFalse(np.any(np.isnan(out)),
+                         "Got \'solution\' {}".format(out))
+
+class SolveTests4(unittest.TestCase):
+    def setUp(self):
+        self.model = pysim.ODEModel.fromFile(os.path.join(test_data, 
+                                                          "solvetest4.model"))
+         
+    def test_solve_without_J(self):
+        out = self.model.solve(False)
+        self.assertFalse(np.any(np.isnan(out)),
+                         "Got \'solution\' {}".format(out))
+
+    def test_solve_with_J(self):
+        out = self.model.solve(True)
+        self.assertFalse(np.any(np.isnan(out)),
+                         "Got \'solution\' {}".format(out))
 
 
 class SetTests(SolveTests):

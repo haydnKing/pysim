@@ -1,0 +1,33 @@
+#model with arsenic
+#p = free promoter
+#r = arsR
+#s = arsR2
+#q= bound promoter
+#As = free arsenic
+#sAs = ArsR2-As
+#sAs2 = ArsR2-As2
+
+#species p=1.0,q=0.0,r=0.0,s=0.0,sAs=0.0,qAs=0.0
+species p=9.17431505e-02, q=9.08256850e-01, r=1.78121168e-02, s=2.68596929e-04
+species sAs=9.32197798e-34, qAs=1.20827764e-31
+const As=100000.0
+#const As=0.0
+constraint q + p + qAs - 1.0
+param kp=4.4721359549995796, mu=0.22360679774997896
+param kd_f=640.31242374328485, kd_r=0.0015617376188860608
+param kr_f=8246.2112512353215, kr_r=0.00012126781251816648
+param akr_f=100.0, akr_r=0.01
+param bkr_f=31.622776601683793, bkr_r=0.031622776601683791
+param ka_f = 31622.776601683792, ka_r =3.1622776601683795e-05
+
+p --[kp]> p + r
+r --[mu]> 
+2r <[kd_r]--[kd_f]> s
+s --[mu]>
+s + p <[kr_r]--[kr_f]> q
+q --[mu]> p
+s + As <[ka_r]--[ka_f]> sAs
+q + As <[ka_r]--[ka_f]> qAs
+sAs --[mu]> As
+sAs + p <[akr_r]--[akr_f]> qAs
+qAs --[mu]> p + As
