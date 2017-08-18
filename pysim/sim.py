@@ -17,73 +17,71 @@ class Sim:
     def numParameters(self):
         return len(self.defaults)
 
-    def addSweep(self, sweeps, relative=False):
+    def sweep(self, parameters=[], ratios=[]):
         """
-            Add a parameter sweep to the simulation
-            sweeps: dictionary of parameter names mapping to values to set
-                all possibile combinations will be solved.
-                Names should be pure parameter names or simple ratios of 
-                parameters, such as "a / b", in which case the ratio a/b will
-                be varied with the product ab held constant.
-                All names in sweeps should be independend, setting a sweep
-                on "a / b" and "b / c" will generate an error, instead try
-                setting a separate sweep.
-            relative: if true, sweep values are multiplied by the default value
+            Setup a sweep experiment, where one or many parameters are 
+            varies over a range of values
+            Each parameter can only be used once, so you can't sweep over 
+            parameter A and the ratio A/B, for example. 
+            parameters: a list of tuples where each tuple is
+                (parameter_name, list_or_array_of_values_to_test)
+            ratios: a list of tuples specifying ratios to scan as
+                    (numerator_name, 
+                    denomenator_name, 
+                    ratios_to_test <list or array>,
+                    products_to_test <list or array, optional>)
+                Ratios sets a/b, products sets a.b.
+                If missing, the list of products will be set to one.
+            Calling this function resets any previous sweeps set.
         """
-        #check each name only features once
-        sweepnames = []
-        for name in sweeps.keys():
-            names = [n.strip() for n in name.split('/')]
-            for n in names:
-                if n in sweepnames:
-                    raise ValueError(("Name \'{}\' used multiple times in " +
-                                      "argument to addSweep").format(n))
+        #check names are unique
+        names = []
+        for n in ([p[0] for p in parameters] + 
+                  [r[i] for i in [0,1] for r in ratios]):
+            if n in names:
+                raise ValueError("Can't sweep on {} more than once".format(n))
+            names.append(n)
 
-        sweeplist = [[x,] for x in self.defaults.values]
-        ratio_idx    = []
-        ratio_prod   = []
-        ratio_values = []
-        for k,v in sweeps.items():
-            if '/' in k:
-                names = [n.strip() for n in k.split('/')]
-                if len(names) != 2:
-                    raise ValueError("Invalid ratio spec \'{}\'".format(k))
-                idx = [self.defaults.getIndexByName(n) for n in names]
-                ratio_idx.append(idx)
-                ratio_prod.append(np.product(
-                    [self.defaults.values[i] for i in idx]))
-                if relative:
-                    ratio_values.append(v * 
-                                        self.defaults.values[idx[0]] / 
-                                        self.defaults.values[idx[1]])
-                else:
-                    ratio_values.append(v)
-            else:
-                idx = self.defaults.getIndexByName(k)
-                if relative:
-                    sweeplist[idx] = np.array(v) * sweeplist[idx]
-                else:
-                    sweeplist[idx] = np.array(v)
+        symbols = self.model.params.merge(self.model.consts)
 
-        rows = np.product([len(x) for x in sweeplist + ratio_values]) 
+        toiter = lambda v: v if hasattr(v, '__iter__') else [v,]
 
-        data = np.zeros((rows, self.numParameters()))
+        #convert everything to arrays and indexes
+        parameters = [(symbols.getIndexByName(p[0]), 
+                       np.array(toiter(p[1]))) for p in parameters]
+        ratios = [(r[0], r[1], r[2], 1.0,) if len(r) == 3 else r
+                    for r in ratios]
+        ratios = [(symbols.getIndexByName(r[0]), 
+                   symbols.getIndexByName(r[1]), 
+                   np.array(toiter(r[2])), 
+                   np.array(toiter(r[3])),) 
+                    for r in ratios]
 
-        lparams = len(self.defaults)
-        for i,p in enumerate(itertools.product(*(sweeplist+ratio_values))):
-            row = list(p[:lparams])
-            #set the ratio parameters
-            for j,r in enumerate(p[lparams:]):
-                a = np.sqrt(r * ratio_prod[j])
-                row[ratio_idx[j][0]] = a
-                row[ratio_idx[j][1]] = ratio_prod[j] / a
+        #get the indexes for each sweep
+        sweep = []
+        for p in parameters:
+            sweep.append(range(len(p[1])))
+        for r in ratios:
+            sweep.append(list(itertools.product(range(len(r[2])),
+                                                range(len(r[3])))))
+        rows = np.product([len(s) for s in sweep])
 
-            data[i] = row
+        data = np.zeros((rows, len(symbols)))
 
-        if self.query:
-            self.query = np.append(self.query, data, axis=0)
-        else:
-            self.query = data
+        P = len(parameters)
+        R = len(ratios)
+
+        for row, vals in enumerate(itertools.product(*sweep)):
+            o = symbols.values.copy()
+            for p,val in zip(parameters, vals[:P]):
+                o[p[0]] = p[1][val]    
+            for r,val in zip(ratios, vals[P:]):
+                o[r[0]] = np.sqrt(r[3][val[1]] * r[2][val[0]])            
+                o[r[1]] = np.sqrt(r[3][val[1]] / r[2][val[0]])            
+
+            data[row,:] = o
+
+        self.query = data
 
     def setDefault(self, key, value):
         self.model.set(key, value)
@@ -103,9 +101,6 @@ class Sim:
             self.query = query.copy()
 
     def solve(self, use_jacobian=True):
-
-        print("kp = {}".format(self.model.get('kp')))
-        print("mu = {}".format(self.model.get('mu')))
 
         o = np.zeros((self.query.shape[0], len(self.model.species)))
         last_solved = -1
