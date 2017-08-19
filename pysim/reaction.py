@@ -64,8 +64,8 @@ class Reaction:
                         l_const,
                         r_stoic,
                         r_const,
-                        cls._parse_rateeq(k_fw, params, species), 
-                        cls._parse_rateeq(k_rv, params, species))
+                        cls._parse_rateeq(k_fw, params, species, consts), 
+                        cls._parse_rateeq(k_rv, params, species, consts))
     
     @classmethod
     def _parse_reactants(cls, species, consts, spec):
@@ -107,7 +107,7 @@ class Reaction:
         return stoic, c_stoic
 
     @staticmethod
-    def _parse_rateeq(args, params, species):
+    def _parse_rateeq(args, params, species, consts):
         #zero rate
         if not args:
             return []
@@ -116,23 +116,29 @@ class Reaction:
             return [params.getIndexByName(args[0]),]
         #michaelis-menten
         elif len(args) == 3:
-            return [species.getIndexByName(args[0]),
+            if not (args[0] in species or args[0] in consts):
+                raise NameLookupError(args[0])
+            return [args[0],
                     params.getIndexByName(args[1]),
                     params.getIndexByName(args[2]),]
         raise ReactionError("Cannot parse reaction rate")
 
     @staticmethod
-    def _get_rateeq(args, params, const):
+    def _get_rateeq(args, species, params, consts):
         """return a function which calculates 1directional rate"""
         if not args:
             return lambda y,s: 0
         if len(args) == 1:
             k = params.values[args[0]]
-            return lambda y,s: k * (s*const)
-        e = args[0]
+            return lambda y,s: k * (s*consts)
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
-        return lambda y,s: (y[e]*k_cat*(s*const))/(k_m+(s*const))
+        if args[0] in species:
+            e = species.getIndexByName(args[0])
+            return lambda y,s: (y[e]*k_cat*(s*consts))/(k_m+(s*consts))
+        #args[0] in consts
+        e = consts.getValueByName(args[0])
+        return lambda y,s: (e*k_cat*(s*consts))/(k_m+(s*consts))
 
     @staticmethod
     def _get_jacobian(args, params, stoic):
@@ -176,8 +182,8 @@ class Reaction:
             species due to this reaction given the current concentrations y"""
         l_c = np.product(np.power(consts.values,self.l_const))
         r_c = np.product(np.power(consts.values,self.r_const))
-        f_fw = self._get_rateeq(self.k_fw, self.params, l_c)
-        f_rv = self._get_rateeq(self.k_rv, self.params, r_c)
+        f_fw = self._get_rateeq(self.k_fw, self.species, self.params, l_c)
+        f_rv = self._get_rateeq(self.k_rv, self.species, self.params, r_c)
 
         def fn(x):
             #find the forward rate of the reaction

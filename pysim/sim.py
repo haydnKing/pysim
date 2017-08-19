@@ -86,6 +86,9 @@ class Sim:
     def setDefault(self, key, value):
         self.model.set(key, value)
 
+    def getDefault(self, key):
+        return self.model.get(key)
+
     def setRatio(self, numerator, denomenator, ratio, product=1.0):
         P = np.sqrt(product)
         self.model.set(numerator, P * np.sqrt(ratio))

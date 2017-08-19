@@ -1,6 +1,5 @@
 from scipy.integrate import ode
 from scipy.optimize import fsolve, approx_fprime
-from scipy.integrate import odeint
 import numpy as np, re
 
 from .reaction import Reaction
@@ -206,22 +205,25 @@ class ODEModel:
         f = self._get_unwrapped_f()
         J = self._get_unwrapped_fprime()
 
-        integrator = ode(lambda t,x: f(x))#, lambda t,x:J(x)) 
-        integrator.set_integrator('vode', 
-                                  method='bdf',
-                                  nsteps=1e4*(
-                                      len(self.species) + 
-                                      len(self.constraints))
+        integrator = ode(lambda t,x: f(x), lambda t,x:J(x)) 
+        integrator.set_integrator('lsoda', 
+                                  #method='bdf',
+                                  #nsteps=1e3*(
+                                  #    len(self.species) + 
+                                  #    len(self.constraints))
                                  )
         integrator.set_initial_value(x_0, 0.0)
 
         dt = 1.0
         x_last = x_0
-        #print("x_0 = {}".format(x_0))
         while integrator.successful() and integrator.t + dt < max_time:
             if np.linalg.norm(f(x_last)) < tol:
                 break
             x_last = integrator.integrate(integrator.t+dt)
+        if not integrator.successful():
+            print("Integration problems at:")
+            print("\tx    = {}".format(x_last))
+            print("\tf(x) = {}".format(f(x_last)))
 
         return np.abs(x_last)
 
@@ -242,7 +244,7 @@ class ODEModel:
 
             (out, info, ier, mesg) = fsolve(self._get_f(), 
                                             initial,
-                                            fprime=fprime,
+                                            #fprime=fprime,
                                             col_deriv=False,
                                             full_output=True)
 
