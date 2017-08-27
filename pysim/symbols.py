@@ -1,5 +1,5 @@
 from .exceptions import *
-import re
+import re, numpy as np
 
 class SymbolTable:
     def __init__(self, var_type=float, default=0.0):
@@ -18,7 +18,7 @@ class SymbolTable:
     def merge(self, rhs):
         r = SymbolTable()
         r.names = self.names + rhs.names
-        r.values = self.values + rhs.values
+        r.values = np.append(np.array(self.values), np.array(rhs.values))
         return r
 
     def addSymbol(self, name, value):

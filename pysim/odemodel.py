@@ -122,7 +122,8 @@ class ODEModel:
     def _get_unwrapped_fprime(self):
         #stoichiometry matrix len(species)xlen(reactions)
         S = np.array([r.getStoiciometry() for r in self.reactions]).T
-        J = [r.getJacobianEquation() for r in self.reactions]
+        J = [r.getJacobianEquation(self.species, self.consts) 
+             for r in self.reactions]
         def j(y):
             return S.dot(np.array([r(y) for r in J]))
                                                      
@@ -184,9 +185,12 @@ class ODEModel:
                 len(self.species), len(species)))
         self.species.values = np.array(species)
 
-    def solveForParams(self, params, initial_conditions=None, use_fprime=True):
+    def solveForParams(self, params, initial_conditions=None, use_fprime=True,
+                      integrate_time=100.0, integrate_tol=1e-3):
         self.setAllParams(params)
-        return self.solve(initial_conditions, use_fprime)
+        return self.solve(initial_conditions, use_fprime,
+                         integrate_time=integrate_time,
+                         integrate_tol=integrate_tol)
 
     def get(self, name):
         """get params or species initial conditions"""
@@ -199,6 +203,8 @@ class ODEModel:
                            .format(name))
 
     def integrate(self, x_0=None, tol=1e-6, max_time=10.0):
+        if max_time < 0:
+            max_time = np.inf
         if x_0 is None:
             x_0 = np.array(self.species.values)
 
@@ -208,9 +214,6 @@ class ODEModel:
         integrator = ode(lambda t,x: f(x), lambda t,x:J(x)) 
         integrator.set_integrator('lsoda', 
                                   #method='bdf',
-                                  #nsteps=1e3*(
-                                  #    len(self.species) + 
-                                  #    len(self.constraints))
                                  )
         integrator.set_initial_value(x_0, 0.0)
 
@@ -224,10 +227,14 @@ class ODEModel:
             print("Integration problems at:")
             print("\tx    = {}".format(x_last))
             print("\tf(x) = {}".format(f(x_last)))
+        if np.linalg.norm(f(x_last)) > tol:
+            print("Maximum time exceeded, norm(f(x)) = {}".format(
+                np.linalg.norm(f(x_last))))
 
         return np.abs(x_last)
 
-    def solve(self, initial=None, use_fprime=True, attempts = 6):
+    def solve(self, initial=None, use_fprime=True, attempts = 6,
+             integrate_time=100.0, integrate_tol=1e-3):
         """Calculate the steady state solution of the system of equations"""
         
         fprime = None
@@ -239,12 +246,11 @@ class ODEModel:
         initial = np.append(np.sqrt(initial),
                             [1.0,] * len(self.constraints))
 
-
         for attempt in range(attempts):
 
             (out, info, ier, mesg) = fsolve(self._get_f(), 
                                             initial,
-                                            #fprime=fprime,
+                                            fprime=fprime,
                                             col_deriv=False,
                                             full_output=True)
 
@@ -252,8 +258,8 @@ class ODEModel:
                 return np.square(out[:len(self.species)]), True
                 
             xi = self.integrate(np.square(initial[:len(self.species)]), 
-                                max_time=10.0,
-                                tol=1e-6)
+                                max_time=integrate_time,
+                                tol=integrate_tol)
             initial = np.append(np.sqrt(xi), [1.0,]*len(self.constraints))
 
         return np.square(initial[:len(self.species)]), False

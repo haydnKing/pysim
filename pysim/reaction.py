@@ -124,24 +124,24 @@ class Reaction:
         raise ReactionError("Cannot parse reaction rate")
 
     @staticmethod
-    def _get_rateeq(args, species, params, consts):
+    def _get_rateeq(args, species, params, consts, C):
         """return a function which calculates 1directional rate"""
         if not args:
             return lambda y,s: 0
         if len(args) == 1:
             k = params.values[args[0]]
-            return lambda y,s: k * (s*consts)
+            return lambda y,s: k * (s*C)
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
         if args[0] in species:
             e = species.getIndexByName(args[0])
-            return lambda y,s: (y[e]*k_cat*(s*consts))/(k_m+(s*consts))
+            return lambda y,s: (y[e]*k_cat*(s*C))/(k_m+(s*C))
         #args[0] in consts
         e = consts.getValueByName(args[0])
-        return lambda y,s: (e*k_cat*(s*consts))/(k_m+(s*consts))
+        return lambda y,s: (e*k_cat*(s*C))/(k_m+(s*C))
 
     @staticmethod
-    def _get_jacobian(args, params, stoic):
+    def _get_jacobian(args, species, consts, params, stoic):
         """return function to calculate row of jacobian from this reaction"""
         if not args:
             return lambda x: np.zeros(len(stoic))
@@ -156,21 +156,28 @@ class Reaction:
                 return a
             return j
 
-        e = args[0]
+        idx=-1
+        if args[0] in consts:
+            val = consts.getValueByName(args[0])
+            e = lambda X: val
+        else:
+            idx = species.getIndexByName(args[0])
+            e = lambda X: X[idx]
         k_cat = params.values[args[1]]
         k_m = params.values[args[2]]
         I = range(len(stoic))
         def j(X):
             s = np.product(np.power(X, stoic))
             a = 1./(k_m + s)
-            b = (X[e] * k_cat * s) * a * a
+            b = (e(X) * k_cat * s) * a * a
             dh = np.array([stoic[i] * np.power(X[i],stoic[i]-1) * 
                            np.product(np.power(np.delete(X,i), 
                                                np.delete(stoic,i)))
                            if stoic[i] else 0.0 for i in I])
-            dg = X[e] * k_cat*dh
+            dg = e(X) * k_cat*dh
             #special case
-            dg[e] = (stoic[e]+1)*k_cat*np.product(np.power(X,stoic))
+            if idx >= 0:
+                dg[idx] = (stoic[idx]+1)*k_cat*np.product(np.power(X,stoic))
             return a*dg - b*dh
         return j
 
@@ -182,8 +189,8 @@ class Reaction:
             species due to this reaction given the current concentrations y"""
         l_c = np.product(np.power(consts.values,self.l_const))
         r_c = np.product(np.power(consts.values,self.r_const))
-        f_fw = self._get_rateeq(self.k_fw, self.species, self.params, l_c)
-        f_rv = self._get_rateeq(self.k_rv, self.species, self.params, r_c)
+        f_fw = self._get_rateeq(self.k_fw, self.species, self.params, consts, l_c)
+        f_rv = self._get_rateeq(self.k_rv, self.species, self.params, consts, r_c)
 
         def fn(x):
             #find the forward rate of the reaction
@@ -195,11 +202,11 @@ class Reaction:
 
         return fn
 
-    def getJacobianEquation(self):
+    def getJacobianEquation(self, species, consts):
         """Return a function which calculates the rates of change for each 
             species due to this reaction given the current concentrations y"""
-        f_fw = self._get_jacobian(self.k_fw, self.params, self.l_stoic)
-        f_rv = self._get_jacobian(self.k_rv, self.params, self.r_stoic)
+        f_fw = self._get_jacobian(self.k_fw, species, consts, self.params, self.l_stoic)
+        f_rv = self._get_jacobian(self.k_rv, species, consts, self.params, self.r_stoic)
 
         def fn(x):
             #find the forward part of the jacobian

@@ -103,24 +103,48 @@ class Sim:
         else:
             self.query = query.copy()
 
-    def solve(self, use_jacobian=True):
+    def solve(self, 
+              use_jacobian=True, 
+              integrate_only=False, 
+              integrate_tol=1e-5,
+              integrate_time=100.0,
+              ic_func=None):
 
         o = np.zeros((self.query.shape[0], len(self.model.species)))
         last_solved = -1
         n_solved = 0
         for i in range(o.shape[0]):
-            print("{} / {} / {}       ".format(i, 
-                                               n_solved, 
+            if not integrate_only:
+                print("{} / {} / {}       ".format(i, 
+                                                   n_solved, 
+                                                   o.shape[0]), end="\r")
+                self.model.setAllParams(self.query[i,:])
+                if ic_func is None:
+                    initial_conditions = (o[last_solved,:] if 
+                                          last_solved > 0 else None)
+                else:
+                    ic_func(self.model.params.merge(self.model.consts),
+                            self.model.species)
+                    initial_conditions=None
+                o[i,:], solved = self.model.solve( 
+                    initial_conditions,
+                    use_jacobian,
+                    integrate_tol=integrate_tol,
+                    integrate_time=integrate_time)
+                #print("got: {}".format(o[i,:]))
+                if solved:
+                    n_solved += 1
+                    last_solved = i
+            else:
+                print("{} / {}       ".format(i, 
                                                o.shape[0]), end="\r")
-            o[i,:], solved = self.model.solveForParams( 
-                self.query[i,:], 
-                o[last_solved,:] if last_solved > 0 else None,
-                use_jacobian)
-            if solved:
-                n_solved += 1
-                last_solved = i
+                self.model.setAllParams(self.query[i,:])
+                x = self.model.integrate(max_time=integrate_time, 
+                                         tol=integrate_tol)
+                o[i,:] = x
 
-        print("Solved {} of {}".format(n_solved, o.shape[0]))
+        if not integrate_only:
+            print("Solved {} of {}".format(n_solved, o.shape[0]))
 
         df = pd.DataFrame(
             data=np.append(self.query,o,1),
